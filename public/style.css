@@ -892,7 +892,7 @@ body {
 .mobile-menu-toggle {
     display: none;
     position: fixed;
-    bottom: 20px;
+    bottom: 80px;  /* Changed from 20px to 80px */
     right: 20px;
     width: 56px;
     height: 56px;
