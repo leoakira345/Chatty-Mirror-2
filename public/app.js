@@ -1,25 +1,39 @@
 // public/app.js
 
-// Simple URL configuration - works for both local and deployed
+// ==========================================
+// CONFIGURATION - AUTO-DETECT ENVIRONMENT
+// ==========================================
+const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+// Automatically use the correct URL based on environment
 const API_URL = '/api';
 const SOCKET_URL = window.location.origin;
 
+console.log('Environment:', isDevelopment ? 'Development' : 'Production');
 console.log('Connecting to:', { API_URL, SOCKET_URL });
 
-// Socket.IO
+// ==========================================
+// SOCKET.IO
+// ==========================================
 let socket = null;
 
-// State
+// ==========================================
+// STATE
+// ==========================================
 let currentUser = null;
 let friends = [];
 let selectedFriend = null;
 let messages = [];
 let typingTimeout = null;
 
-// Emojis
+// ==========================================
+// EMOJIS
+// ==========================================
 const emojis = ['😀', '😂', '😍', '🥰', '😎', '🤔', '👍', '❤️', '🔥', '✨', '🎉', '💯', '😊', '🙌', '💪', '🌟'];
 
-// DOM Elements
+// ==========================================
+// DOM ELEMENTS
+// ==========================================
 const loadingOverlay = document.getElementById('loadingOverlay');
 const currentUserIdEl = document.getElementById('currentUserId');
 const connectionStatus = document.getElementById('connectionStatus');
@@ -44,43 +58,41 @@ const fileInput = document.getElementById('fileInput');
 const emojiBtn = document.getElementById('emojiBtn');
 const emojiPicker = document.getElementById('emojiPicker');
 
-// Initialize
+// ==========================================
+// INITIALIZE
+// ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
     await initializeApp();
     setupEventListeners();
     initializeEmojiPicker();
     initializeSocket();
+    setupMobileMenu();
 });
 
 async function initializeApp() {
     try {
-        // Check if user already exists in localStorage
         const storedUser = localStorage.getItem('chatty_mirror_user');
 
         if (storedUser) {
-            // Use existing user
             currentUser = JSON.parse(storedUser);
             console.log('Loaded existing user:', currentUser.id);
             currentUserIdEl.textContent = currentUser.id;
 
-            // Verify user still exists on server
             const verifyResponse = await fetch(`${API_URL}/user/${currentUser.id}`);
             const verifyData = await verifyResponse.json();
 
             if (!verifyData.success || !verifyData.user) {
-                // User doesn't exist on server, create new one
                 console.log('User not found on server, creating new user');
                 await createNewUser();
             }
         } else {
-            // Create new user
             await createNewUser();
         }
 
         await loadFriends();
     } catch (error) {
         console.error('Error initializing app:', error);
-        alert('Failed to connect to server. Please check your internet connection.');
+        showConnectionError();
     } finally {
         loadingOverlay.style.display = 'none';
     }
@@ -88,14 +100,16 @@ async function initializeApp() {
 
 async function createNewUser() {
     const response = await fetch(`${API_URL}/user/init`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
     });
 
     const data = await response.json();
 
     if (data.success) {
         currentUser = data.user;
-        // Save user to localStorage
         localStorage.setItem('chatty_mirror_user', JSON.stringify(currentUser));
         console.log('Created new user:', currentUser.id);
         currentUserIdEl.textContent = currentUser.id;
@@ -104,18 +118,37 @@ async function createNewUser() {
     }
 }
 
+function showConnectionError() {
+    const errorMessage = `
+        <div style="text-align: center; padding: 2rem; color: #ef4444;">
+            <svg style="width: 64px; height: 64px; margin: 0 auto 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <h3>Connection Failed</h3>
+            <p>Unable to connect to the server.</p>
+            <button onclick="location.reload()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #3b82f6; color: white; border: none; border-radius: 0.5rem; cursor: pointer;">Retry</button>
+        </div>
+    `;
+    document.body.innerHTML = errorMessage;
+}
+
 function initializeSocket() {
+    console.log('Initializing Socket.IO connection to:', SOCKET_URL);
+    
     socket = io(SOCKET_URL, {
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
         reconnectionAttempts: Infinity,
-        transports: ['polling', 'websocket'] // Polling first for better compatibility
+        transports: ['websocket', 'polling'],
+        upgrade: true,
+        timeout: 20000
     });
 
-    // Connection status
     socket.on('connect', () => {
-        console.log('Socket connected:', socket.id);
+        console.log('✅ Socket connected:', socket.id);
         connectionStatus.style.color = '#10b981';
         connectionStatus.title = 'Connected';
 
@@ -124,35 +157,33 @@ function initializeSocket() {
         }
     });
 
-    socket.on('disconnect', () => {
-        console.log('Socket disconnected');
+    socket.on('disconnect', (reason) => {
+        console.log('❌ Socket disconnected:', reason);
         connectionStatus.style.color = '#ef4444';
         connectionStatus.title = 'Disconnected';
     });
 
     socket.on('reconnect', (attemptNumber) => {
-        console.log('Socket reconnected after', attemptNumber, 'attempts');
+        console.log('🔄 Reconnected after', attemptNumber, 'attempts');
         if (currentUser) {
             socket.emit('user_connected', currentUser.id);
         }
+        loadFriends();
+        if (selectedFriend) loadMessages();
     });
 
-    // New message received
     socket.on('new_message', (message) => {
-        console.log('New message received:', message);
+        console.log('📨 New message:', message);
 
-        // Check if message is relevant to current conversation
         const isRelevant = selectedFriend && (
-            message.senderId === selectedFriend.id || 
-            message.receiverId === selectedFriend.id
+            (message.senderId === selectedFriend.id && message.receiverId === currentUser.id) ||
+            (message.senderId === currentUser.id && message.receiverId === selectedFriend.id)
         );
 
         if (isRelevant) {
-            // Check if message already exists (to prevent duplicates)
             const exists = messages.some(m => 
-                m.timestamp === message.timestamp && 
-                m.senderId === message.senderId &&
-                m.content === message.content
+                m.id === message.id ||
+                (m.timestamp === message.timestamp && m.senderId === message.senderId && m.content === message.content)
             );
 
             if (!exists) {
@@ -162,57 +193,42 @@ function initializeSocket() {
             }
         }
 
-        // Update friend list
         loadFriends();
 
-        // Show notification
-        if ('Notification' in window && Notification.permission === 'granted') {
-            if (message.senderId !== currentUser.id && 
-                (!selectedFriend || message.senderId !== selectedFriend.id || !document.hasFocus())) {
-                new Notification('New message from Chatty Mirror', {
-                    body: 'You have a new message',
-                    icon: '/favicon.ico'
-                });
-            }
+        if (message.senderId !== currentUser.id) {
+            showNotification(message);
         }
     });
 
-    // Message sent confirmation
     socket.on('message_sent', (data) => {
         if (data.success) {
-            console.log('Message sent successfully');
+            console.log('✅ Message sent:', data.message.id);
         } else {
-            console.error('Message send failed:', data.error);
-            alert('Failed to send message. Please try again.');
-            
-            if (messages.length > 0 && messages[messages.length - 1].senderId === currentUser.id) {
+            console.error('❌ Send failed:', data.error);
+            alert('Failed to send message.');
+            if (messages.length > 0 && messages[messages.length - 1].id.startsWith('temp_')) {
                 messages.pop();
                 renderMessages();
             }
         }
     });
 
-    // Friend added notification
     socket.on('friend_added', async (data) => {
-        console.log('Friend added:', data);
+        console.log('👥 Friend added:', data);
         await loadFriends();
     });
 
-    // User status updates
     socket.on('user_status', (data) => {
-        console.log('User status:', data);
         const friend = friends.find(f => f.id === data.userId);
         if (friend) {
             friend.isOnline = data.status === 'online';
             renderFriends();
-
             if (selectedFriend && selectedFriend.id === data.userId) {
                 updateOnlineStatus(data.status === 'online');
             }
         }
     });
 
-    // Typing indicator
     socket.on('user_typing', (data) => {
         if (selectedFriend && data.userId === selectedFriend.id) {
             typingIndicator.style.display = 'block';
@@ -225,24 +241,44 @@ function initializeSocket() {
         }
     });
 
-    // Connection error
     socket.on('connect_error', (error) => {
-        console.error('Connection error:', error);
+        console.error('❌ Connection error:', error.message);
         connectionStatus.style.color = '#ef4444';
-        connectionStatus.title = 'Connection Error';
     });
 }
 
+function showNotification(message) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        if (!selectedFriend || message.senderId !== selectedFriend.id || !document.hasFocus()) {
+            const friend = friends.find(f => f.id === message.senderId);
+            const friendName = friend ? friend.username : 'Someone';
+            
+            let body = 'You have a new message';
+            if (message.type === 'text') {
+                body = message.content.substring(0, 50);
+            } else if (message.type === 'image') {
+                body = '📷 Sent an image';
+            } else if (message.type === 'video') {
+                body = '🎥 Sent a video';
+            } else if (message.type === 'file') {
+                body = '📎 Sent a file';
+            }
+
+            new Notification(`${friendName} - Chatty Mirror`, {
+                body: body,
+                icon: '/favicon.ico'
+            });
+        }
+    }
+}
+
 function setupEventListeners() {
-    // Tab switching
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            const tabName = btn.dataset.tab;
-            switchTab(tabName);
+            switchTab(btn.dataset.tab);
         });
     });
 
-    // Search user
     searchBtn.addEventListener('click', searchUser);
     searchInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') searchUser();
@@ -251,7 +287,6 @@ function setupEventListeners() {
         e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4);
     });
 
-    // Send message
     sendBtn.addEventListener('click', sendMessage);
     messageInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -260,7 +295,6 @@ function setupEventListeners() {
         }
     });
 
-    // Typing indicator
     messageInput.addEventListener('input', () => {
         if (!selectedFriend || !socket || !socket.connected) return;
 
@@ -278,17 +312,14 @@ function setupEventListeners() {
         }, 1000);
     });
 
-    // File upload
     fileBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', handleFileUpload);
 
-    // Emoji picker
     emojiBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         emojiPicker.style.display = emojiPicker.style.display === 'none' ? 'flex' : 'none';
     });
 
-    // Close emoji picker when clicking outside
     document.addEventListener('click', (e) => {
         if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
             emojiPicker.style.display = 'none';
@@ -350,11 +381,9 @@ function renderFriends() {
         </div>
     `).join('');
 
-    // Add click listeners
     document.querySelectorAll('.friend-item').forEach(item => {
         item.addEventListener('click', () => {
-            const friendId = item.dataset.friendId;
-            selectFriend(friendId);
+            selectFriend(item.dataset.friendId);
         });
     });
 }
@@ -371,7 +400,6 @@ function selectFriend(friendId) {
         chatFriendId.textContent = `ID: ${selectedFriend.id}`;
 
         updateOnlineStatus(selectedFriend.isOnline);
-
         renderFriends();
         loadMessages();
     }
@@ -459,13 +487,13 @@ async function addFriend(friendId, friendUsername) {
             searchResult.style.display = 'none';
             searchInput.value = '';
             switchTab('chats');
-            alert(`${friendUsername} added as friend successfully!`);
+            alert(`${friendUsername} added successfully!`);
         } else {
-            alert('Failed to add friend. Please try again.');
+            alert(data.message || 'Failed to add friend.');
         }
     } catch (error) {
         console.error('Error adding friend:', error);
-        alert('Failed to add friend. Please try again.');
+        alert('Failed to add friend.');
     }
 }
 
@@ -562,21 +590,12 @@ function sendMessage() {
     if (!content || !selectedFriend) return;
 
     if (!socket || !socket.connected) {
-        alert('Not connected to server. Please check your connection.');
+        alert('Not connected to server.');
         return;
     }
 
-    // Send via Socket.IO
-    socket.emit('send_message', {
-        senderId: currentUser.id,
-        receiverId: selectedFriend.id,
-        content: content,
-        type: 'text'
-    });
-
-    // Add to local messages immediately
-    const message = {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+    const tempMessage = {
+        id: 'temp_' + Date.now() + Math.random().toString(36).substr(2, 9),
         senderId: currentUser.id,
         receiverId: selectedFriend.id,
         content: content,
@@ -584,17 +603,21 @@ function sendMessage() {
         timestamp: Date.now()
     };
 
-    messages.push(message);
+    messages.push(tempMessage);
     renderMessages();
     scrollToBottom();
 
     messageInput.value = '';
     emojiPicker.style.display = 'none';
 
-    // Stop typing indicator
-    if (typingTimeout) {
-        clearTimeout(typingTimeout);
-    }
+    socket.emit('send_message', {
+        senderId: currentUser.id,
+        receiverId: selectedFriend.id,
+        content: content,
+        type: 'text'
+    });
+
+    if (typingTimeout) clearTimeout(typingTimeout);
     socket.emit('stop_typing', {
         senderId: currentUser.id,
         receiverId: selectedFriend.id
@@ -618,7 +641,7 @@ async function handleFileUpload(e) {
     }
 
     if (!socket || !socket.connected) {
-        alert('Not connected to server. Please check your connection.');
+        alert('Not connected to server.');
         fileInput.value = '';
         return;
     }
@@ -639,17 +662,8 @@ async function handleFileUpload(e) {
             messageType = 'video';
         }
 
-        // Send via Socket.IO
-        socket.emit('send_message', {
-            senderId: currentUser.id,
-            receiverId: selectedFriend.id,
-            content: JSON.stringify(fileData),
-            type: messageType
-        });
-
-        // Add to local messages immediately
-        const message = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        const tempMessage = {
+            id: 'temp_' + Date.now() + Math.random().toString(36).substr(2, 9),
             senderId: currentUser.id,
             receiverId: selectedFriend.id,
             content: JSON.stringify(fileData),
@@ -657,15 +671,22 @@ async function handleFileUpload(e) {
             timestamp: Date.now()
         };
 
-        messages.push(message);
+        messages.push(tempMessage);
         renderMessages();
         scrollToBottom();
+
+        socket.emit('send_message', {
+            senderId: currentUser.id,
+            receiverId: selectedFriend.id,
+            content: JSON.stringify(fileData),
+            type: messageType
+        });
 
         fileInput.value = '';
     };
 
     reader.onerror = () => {
-        alert('Failed to read file. Please try again.');
+        alert('Failed to read file.');
         fileInput.value = '';
     };
 
@@ -684,6 +705,57 @@ function insertEmoji(emoji) {
     emojiPicker.style.display = 'none';
 }
 
+function setupMobileMenu() {
+    const mobileToggle = document.createElement('button');
+    mobileToggle.className = 'mobile-menu-toggle';
+    mobileToggle.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 24px; height: 24px;">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+    `;
+    mobileToggle.setAttribute('aria-label', 'Toggle friends list');
+    document.body.appendChild(mobileToggle);
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'mobile-backdrop';
+    document.body.appendChild(backdrop);
+
+    const sidebar = document.querySelector('.sidebar');
+
+    mobileToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('mobile-open');
+        backdrop.classList.toggle('active');
+    });
+
+    backdrop.addEventListener('click', () => {
+        sidebar.classList.remove('mobile-open');
+        backdrop.classList.remove('active');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('.friend-item') && window.innerWidth < 768) {
+            setTimeout(() => {
+                sidebar.classList.remove('mobile-open');
+                backdrop.classList.remove('active');
+            }, 300);
+        }
+    });
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            if (window.innerWidth >= 768) {
+                sidebar.classList.remove('mobile-open');
+                backdrop.classList.remove('active');
+            }
+        }, 250);
+    });
+}
+
 function escapeHtml(text) {
     const map = {
         '&': '&amp;',
@@ -695,30 +767,22 @@ function escapeHtml(text) {
     return text.replace(/[&<>"']/g, m => map[m]);
 }
 
-// Request notification permission
 if ('Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission();
 }
 
-// Cleanup on page unload
 window.addEventListener('beforeunload', () => {
-    if (socket) {
-        socket.disconnect();
-    }
+    if (socket) socket.disconnect();
 });
 
-// Reconnect socket when coming back online
 window.addEventListener('online', () => {
     console.log('Back online');
-    if (socket && !socket.connected) {
-        socket.connect();
-    }
+    if (socket && !socket.connected) socket.connect();
 });
 
 window.addEventListener('offline', () => {
     console.log('Gone offline');
 });
 
-// Global functions for inline onclick handlers
 window.addFriend = addFriend;
 window.insertEmoji = insertEmoji;
