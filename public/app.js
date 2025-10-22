@@ -1,7 +1,15 @@
 // public/app.js
 
-const API_URL = 'http://localhost:3000/api';
-const SOCKET_URL = 'http://localhost:3000';
+// Use deployed URL or localhost based on current location
+const API_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3000/api' 
+    : `${window.location.protocol}//${window.location.host}/api`;
+
+const SOCKET_URL = window.location.hostname === 'localhost'
+    ? 'http://localhost:3000'
+    : `${window.location.protocol}//${window.location.host}`;
+
+console.log('Connecting to:', { API_URL, SOCKET_URL });
 
 // Socket.IO
 let socket = null;
@@ -77,7 +85,7 @@ async function initializeApp() {
         await loadFriends();
     } catch (error) {
         console.error('Error initializing app:', error);
-        alert('Failed to connect to server. Please make sure the server is running on port 3000.');
+        alert('Failed to connect to server. Please check your internet connection.');
     } finally {
         loadingOverlay.style.display = 'none';
     }
@@ -106,7 +114,8 @@ function initializeSocket() {
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
-        reconnectionAttempts: Infinity
+        reconnectionAttempts: Infinity,
+        transports: ['websocket', 'polling'] // Try websocket first, fallback to polling
     });
 
     // Connection status
@@ -138,9 +147,6 @@ function initializeSocket() {
         console.log('New message received:', message);
 
         // Check if message is relevant to current conversation
-        // Message is relevant if:
-        // 1. We're chatting with the sender (they sent us a message)
-        // 2. We're chatting with the receiver (we sent them a message from another device/tab)
         const isRelevant = selectedFriend && (
             message.senderId === selectedFriend.id || 
             message.receiverId === selectedFriend.id
@@ -161,14 +167,11 @@ function initializeSocket() {
             }
         }
 
-        // Update friend list to show last message indicator (optional enhancement)
+        // Update friend list to show last message indicator
         loadFriends();
 
         // Play notification sound or show notification
         if ('Notification' in window && Notification.permission === 'granted') {
-            // Only notify if message is from someone else and either:
-            // - We're not chatting with them, OR
-            // - The window/tab is not focused
             if (message.senderId !== currentUser.id && 
                 (!selectedFriend || message.senderId !== selectedFriend.id || !document.hasFocus())) {
                 new Notification('New message from Chatty Mirror', {
