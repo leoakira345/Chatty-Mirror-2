@@ -197,6 +197,7 @@ app.get('/', (req, res) => {
             health: '/api/health',
             initUser: '/api/user/init',
             getUser: '/api/user/:userId',
+            updateUser: '/api/user/update',
             friends: '/api/friends/:userId',
             messages: '/api/messages/:userId1/:userId2'
         }
@@ -258,6 +259,76 @@ app.get('/api/user/:userId', async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to get user'
+        });
+    }
+});
+
+// Update user profile (NEW ENDPOINT)
+app.post('/api/user/update', async (req, res) => {
+    try {
+        const { userId, username } = req.body;
+
+        // Validate required fields
+        if (!userId || !username) {
+            return res.json({ 
+                success: false, 
+                message: 'User ID and username are required' 
+            });
+        }
+
+        // Validate username length
+        if (username.length < 2 || username.length > 25) {
+            return res.json({ 
+                success: false, 
+                message: 'Username must be between 2 and 25 characters' 
+            });
+        }
+
+        // Validate user ID format
+        if (!/^\d{4}$/.test(userId)) {
+            return res.json({
+                success: false,
+                message: 'Invalid user ID format'
+            });
+        }
+
+        // Check if user exists
+        const user = await readJSON(`user_${userId}.json`);
+        
+        if (!user) {
+            return res.json({ 
+                success: false, 
+                message: 'User not found' 
+            });
+        }
+
+        // Update username
+        user.username = username;
+        user.updatedAt = Date.now();
+
+        // Save updated user data
+        const saved = await writeJSON(`user_${userId}.json`, user);
+
+        if (saved) {
+            console.log(`Profile updated for user ${userId}: ${username}`);
+            
+            res.json({ 
+                success: true, 
+                user: user,
+                message: 'Profile updated successfully' 
+            });
+        } else {
+            res.json({ 
+                success: false, 
+                message: 'Failed to save profile' 
+            });
+        }
+
+    } catch (error) {
+        console.error('Error updating user profile:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error while updating profile' 
         });
     }
 });
