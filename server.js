@@ -10,14 +10,23 @@ const server = http.createServer(app);
 const io = socketIO(server, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST"]
-    }
+        methods: ["GET", "POST"],
+        credentials: true
+    },
+    // Add these options for better connectivity
+    transports: ['websocket', 'polling'],
+    allowEIO3: true
 });
 
-const PORT = 3000;
+// Use environment variable PORT or default to 3000
+const PORT = process.env.PORT || 3000;
+const HOST = '0.0.0.0'; // Listen on all network interfaces
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: "*",
+    credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static('public'));
 
@@ -178,6 +187,21 @@ io.on('connection', (socket) => {
 });
 
 // API Routes
+
+// Root route
+app.get('/', (req, res) => {
+    res.json({
+        success: true,
+        message: 'Chatty Mirror Server is running',
+        endpoints: {
+            health: '/api/health',
+            initUser: '/api/user/init',
+            getUser: '/api/user/:userId',
+            friends: '/api/friends/:userId',
+            messages: '/api/messages/:userId1/:userId2'
+        }
+    });
+});
 
 // Initialize or get user
 app.post('/api/user/init', async (req, res) => {
@@ -443,15 +467,16 @@ app.get('/api/health', (req, res) => {
         success: true,
         message: 'Server is running',
         activeUsers: activeUsers.size,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        port: PORT
     });
 });
 
-// Start server
+// Start server - FIXED to listen on all interfaces
 async function startServer() {
     await ensureDataDirectory();
     
-    server.listen(PORT, () => {
+    server.listen(PORT, HOST, () => {
         console.log('=================================');
         console.log('  Chatty Mirror Server Started');
         console.log('  WITH SOCKET.IO REAL-TIME');
@@ -459,6 +484,11 @@ async function startServer() {
         console.log(`  Server: http://localhost:${PORT}`);
         console.log(`  API: http://localhost:${PORT}/api`);
         console.log(`  WebSocket: ws://localhost:${PORT}`);
+        console.log(`  Host: ${HOST} (All network interfaces)`);
+        console.log('=================================');
+        console.log('  Local access: http://localhost:' + PORT);
+        console.log('  Network access: http://YOUR_IP:' + PORT);
+        console.log('  (Find your IP with: ipconfig or ifconfig)');
         console.log('=================================');
         console.log('  Server is ready to accept connections');
         console.log('  Press Ctrl+C to stop');
