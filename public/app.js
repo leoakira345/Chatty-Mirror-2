@@ -1,13 +1,8 @@
 // public/app.js
 
-// Use deployed URL or localhost based on current location
-const API_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:3000/api' 
-    : `${window.location.protocol}//${window.location.host}/api`;
-
-const SOCKET_URL = window.location.hostname === 'localhost'
-    ? 'http://localhost:3000'
-    : `${window.location.protocol}//${window.location.host}`;
+// Simple URL configuration - works for both local and deployed
+const API_URL = '/api';
+const SOCKET_URL = window.location.origin;
 
 console.log('Connecting to:', { API_URL, SOCKET_URL });
 
@@ -115,7 +110,7 @@ function initializeSocket() {
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
         reconnectionAttempts: Infinity,
-        transports: ['websocket', 'polling'] // Try websocket first, fallback to polling
+        transports: ['polling', 'websocket'] // Polling first for better compatibility
     });
 
     // Connection status
@@ -142,7 +137,7 @@ function initializeSocket() {
         }
     });
 
-    // New message received - FIXED VERSION
+    // New message received
     socket.on('new_message', (message) => {
         console.log('New message received:', message);
 
@@ -167,10 +162,10 @@ function initializeSocket() {
             }
         }
 
-        // Update friend list to show last message indicator
+        // Update friend list
         loadFriends();
 
-        // Play notification sound or show notification
+        // Show notification
         if ('Notification' in window && Notification.permission === 'granted') {
             if (message.senderId !== currentUser.id && 
                 (!selectedFriend || message.senderId !== selectedFriend.id || !document.hasFocus())) {
@@ -190,7 +185,6 @@ function initializeSocket() {
             console.error('Message send failed:', data.error);
             alert('Failed to send message. Please try again.');
             
-            // Remove the last message if it failed to send
             if (messages.length > 0 && messages[messages.length - 1].senderId === currentUser.id) {
                 messages.pop();
                 renderMessages();
@@ -212,7 +206,6 @@ function initializeSocket() {
             friend.isOnline = data.status === 'online';
             renderFriends();
 
-            // Update online indicator if chatting with this friend
             if (selectedFriend && selectedFriend.id === data.userId) {
                 updateOnlineStatus(data.status === 'online');
             }
@@ -581,7 +574,7 @@ function sendMessage() {
         type: 'text'
     });
 
-    // Add to local messages immediately for instant feedback
+    // Add to local messages immediately
     const message = {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
         senderId: currentUser.id,
@@ -654,7 +647,7 @@ async function handleFileUpload(e) {
             type: messageType
         });
 
-        // Add to local messages immediately for instant feedback
+        // Add to local messages immediately
         const message = {
             id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
             senderId: currentUser.id,
