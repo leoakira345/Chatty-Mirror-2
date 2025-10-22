@@ -26,12 +26,20 @@
                 </svg>
                 <span>Chatty Mirror</span>
             </h1>
-            <div class="user-id-badge">
-                <span style="display: inline-block;">ID:</span>
-                <span id="currentUserId">----</span>
-                <svg id="connectionStatus" class="icon" style="color: #ef4444;" viewBox="0 0 24 24" fill="currentColor" title="Disconnected">
-                    <circle cx="12" cy="12" r="10"></circle>
-                </svg>
+            <div class="header-actions">
+                <div class="user-id-badge">
+                    <span style="display: inline-block;">ID:</span>
+                    <span id="currentUserId">----</span>
+                    <svg id="connectionStatus" class="icon" style="color: #ef4444;" viewBox="0 0 24 24" fill="currentColor" title="Disconnected">
+                        <circle cx="12" cy="12" r="10"></circle>
+                    </svg>
+                </div>
+                <button class="icon-btn settings-btn" id="settingsBtn" title="Settings" aria-label="Settings">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12 1v6m0 6v6m5.2-13.2l-1.4 1.4m-7.6 7.6L6.8 16.2M23 12h-6m-6 0H1m16.2 5.2l-1.4-1.4m-7.6-7.6L6.8 7.8"></path>
+                    </svg>
+                </button>
             </div>
         </div>
     </header>
@@ -185,6 +193,110 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal" style="display: none;">
+        <div class="modal-overlay" id="settingsOverlay"></div>
+        <div class="modal-content settings-modal">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="close-btn" id="closeSettingsBtn" aria-label="Close settings">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-menu">
+                    <button class="settings-menu-item" id="editProfileBtn">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        <span>Edit Profile</span>
+                        <svg class="icon chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div id="editProfileModal" class="modal" style="display: none;">
+        <div class="modal-overlay" id="editProfileOverlay"></div>
+        <div class="modal-content edit-profile-modal">
+            <div class="modal-header">
+                <button class="back-btn" id="backToSettingsBtn" aria-label="Back to settings">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+                <h2>Edit Profile</h2>
+                <button class="close-btn" id="closeEditProfileBtn" aria-label="Close">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="profile-edit-container">
+                    <!-- Profile Photo Section -->
+                    <div class="profile-photo-section">
+                        <div class="profile-photo-wrapper">
+                            <div class="profile-photo" id="profilePhoto">
+                                <img id="profilePhotoImg" src="" alt="Profile" style="display: none;">
+                                <span id="profilePhotoInitial">U</span>
+                            </div>
+                            <button class="upload-photo-btn" id="uploadPhotoBtn" title="Upload photo">
+                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                                    <circle cx="12" cy="13" r="4"></circle>
+                                </svg>
+                            </button>
+                            <input 
+                                type="file" 
+                                id="profilePhotoInput" 
+                                accept="image/*" 
+                                style="display: none;"
+                                aria-label="Upload profile photo">
+                        </div>
+                        <p class="profile-photo-hint">Click camera icon to upload photo</p>
+                    </div>
+
+                    <!-- Username Section -->
+                    <div class="profile-field">
+                        <label for="usernameInput" class="profile-label">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            <span>Username</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="usernameInput" 
+                            class="profile-input" 
+                            placeholder="Enter your username"
+                            maxlength="25"
+                            autocomplete="off">
+                        <p class="profile-field-hint">This name will be visible to your friends</p>
+                    </div>
+
+                    <!-- Save Button -->
+                    <button class="save-profile-btn" id="saveProfileBtn">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        <span>Save</span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Loading Overlay -->
