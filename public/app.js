@@ -58,6 +58,24 @@ const fileInput = document.getElementById('fileInput');
 const emojiBtn = document.getElementById('emojiBtn');
 const emojiPicker = document.getElementById('emojiPicker');
 
+// Settings Modal Elements
+const settingsModal = document.getElementById('settingsModal');
+const settingsOverlay = document.getElementById('settingsOverlay');
+const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+const editProfileBtn = document.getElementById('editProfileBtn');
+
+// Edit Profile Modal Elements
+const editProfileModal = document.getElementById('editProfileModal');
+const editProfileOverlay = document.getElementById('editProfileOverlay');
+const closeEditProfileBtn = document.getElementById('closeEditProfileBtn');
+const backToSettingsBtn = document.getElementById('backToSettingsBtn');
+const uploadPhotoBtn = document.getElementById('uploadPhotoBtn');
+const profilePhotoInput = document.getElementById('profilePhotoInput');
+const profilePhotoImg = document.getElementById('profilePhotoImg');
+const profilePhotoInitial = document.getElementById('profilePhotoInitial');
+const usernameInput = document.getElementById('usernameInput');
+const saveProfileBtn = document.getElementById('saveProfileBtn');
+
 // ==========================================
 // INITIALIZE
 // ==========================================
@@ -67,6 +85,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initializeEmojiPicker();
     initializeSocket();
     setupMobileMenu();
+    setupSettingsModal();
 });
 
 async function initializeApp() {
@@ -90,6 +109,7 @@ async function initializeApp() {
         }
 
         await loadFriends();
+        loadUserProfile();
     } catch (error) {
         console.error('Error initializing app:', error);
         showConnectionError();
@@ -418,6 +438,7 @@ function updateOnlineStatus(isOnline) {
 async function searchUser() {
     const userId = searchInput.value.trim();
 
+    // Validate input
     if (!userId || userId.length !== 4) {
         alert('Please enter a valid 4-digit ID');
         return;
@@ -428,9 +449,36 @@ async function searchUser() {
         return;
     }
 
+    // Show loading state
+    searchBtn.disabled = true;
+    searchBtn.innerHTML = `
+        <svg class="icon animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+        </svg>
+    `;
+
     try {
-        const response = await fetch(`${API_URL}/user/${userId}`);
+        console.log('Searching for user:', userId);
+        console.log('API URL:', `${API_URL}/user/${userId}`);
+        
+        const response = await fetch(`${API_URL}/user/${userId}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+
+        // Check if response is ok
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Parse JSON
         const data = await response.json();
+        console.log('Response data:', data);
 
         if (data.success && data.user) {
             const isFriend = friends.some(f => f.id === data.user.id);
@@ -441,7 +489,30 @@ async function searchUser() {
         }
     } catch (error) {
         console.error('Error searching user:', error);
-        alert('Failed to search user. Please try again.');
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack
+        });
+        
+        // More specific error messages
+        if (error.message.includes('Failed to fetch')) {
+            alert('Cannot connect to server. Please check your connection and try again.');
+        } else if (error.message.includes('HTTP error')) {
+            alert(`Server error: ${error.message}. Please try again later.`);
+        } else {
+            alert('Failed to search user. Please try again.');
+        }
+        
+        searchResult.style.display = 'none';
+    } finally {
+        // Reset button state
+        searchBtn.disabled = false;
+        searchBtn.innerHTML = `
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.35-4.35"></path>
+            </svg>
+        `;
     }
 }
 
@@ -705,6 +776,12 @@ function insertEmoji(emoji) {
     emojiPicker.style.display = 'none';
 }
 
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 function setupMobileMenu() {
     const mobileToggle = document.createElement('button');
     mobileToggle.className = 'mobile-menu-toggle';
@@ -756,33 +833,217 @@ function setupMobileMenu() {
     });
 }
 
-function escapeHtml(text) {
-    const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
+// ==========================================
+// SETTINGS MODAL FUNCTIONALITY
+// ==========================================
+function setupSettingsModal() {
+    // Open Settings Modal
+    const settingsBtn = document.getElementById('settingsBtn');
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', openSettingsModal);
+    }
+
+    // Close Settings Modal
+    closeSettingsBtn.addEventListener('click', closeSettingsModal);
+    settingsOverlay.addEventListener('click', closeSettingsModal);
+
+    // Open Edit Profile Modal from Settings
+    editProfileBtn.addEventListener('click', () => {
+        closeSettingsModal();
+        openEditProfileModal();
+    });
+
+    // Close Edit Profile Modal
+    closeEditProfileBtn.addEventListener('click', closeEditProfileModal);
+    editProfileOverlay.addEventListener('click', closeEditProfileModal);
+
+    // Back to Settings from Edit Profile
+    backToSettingsBtn.addEventListener('click', () => {
+        closeEditProfileModal();
+        openSettingsModal();
+    });
+
+    // Profile Photo Upload
+    uploadPhotoBtn.addEventListener('click', () => {
+        profilePhotoInput.click();
+    });
+
+    profilePhotoInput.addEventListener('change', handleProfilePhotoUpload);
+
+    // Save Profile
+    saveProfileBtn.addEventListener('click', saveProfile);
+
+    // Close modals on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (editProfileModal.style.display === 'flex') {
+                closeEditProfileModal();
+            } else if (settingsModal.style.display === 'flex') {
+                closeSettingsModal();
+            }
+        }
+    });
+}
+
+function openSettingsModal() {
+    settingsModal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeSettingsModal() {
+    settingsModal.style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+function openEditProfileModal() {
+    editProfileModal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    loadUserProfile();
+}
+
+function closeEditProfileModal() {
+    editProfileModal.style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+function loadUserProfile() {
+    if (!currentUser) return;
+
+    // Load username
+    usernameInput.value = currentUser.username || '';
+
+    // Load profile photo if exists
+    const savedPhoto = localStorage.getItem(`profile_photo_${currentUser.id}`);
+    if (savedPhoto) {
+        profilePhotoImg.src = savedPhoto;
+        profilePhotoImg.style.display = 'block';
+        profilePhotoInitial.style.display = 'none';
+    } else {
+        profilePhotoImg.style.display = 'none';
+        profilePhotoInitial.style.display = 'flex';
+        profilePhotoInitial.textContent = currentUser.username ? currentUser.username[0].toUpperCase() : 'U';
+    }
+}
+
+function handleProfilePhotoUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        profilePhotoInput.value = '';
+        return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+        alert('Image size must be less than 2MB');
+        profilePhotoInput.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const imageData = event.target.result;
+        
+        // Display preview
+        profilePhotoImg.src = imageData;
+        profilePhotoImg.style.display = 'block';
+        profilePhotoInitial.style.display = 'none';
+        
+        // Store temporarily (will be saved when user clicks Save)
+        profilePhotoInput.setAttribute('data-temp-photo', imageData);
     };
-    return text.replace(/[&<>"']/g, m => map[m]);
+
+    reader.onerror = () => {
+        alert('Failed to read image file.');
+        profilePhotoInput.value = '';
+    };
+
+    reader.readAsDataURL(file);
 }
 
-if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
+async function saveProfile() {
+    const newUsername = usernameInput.value.trim();
+
+    // Validate username
+    if (!newUsername) {
+        alert('Please enter a username');
+        return;
+    }
+
+    if (newUsername.length < 2) {
+        alert('Username must be at least 2 characters');
+        return;
+    }
+
+    if (newUsername.length > 25) {
+        alert('Username must be less than 25 characters');
+        return;
+    }
+
+    try {
+        // Show loading state
+        saveProfileBtn.disabled = true;
+        saveProfileBtn.innerHTML = `
+            <svg class="icon animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+            </svg>
+            <span>Saving...</span>
+        `;
+
+        // Update username on server
+        const response = await fetch(`${API_URL}/user/update`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                userId: currentUser.id,
+                username: newUsername
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Update local user object
+            currentUser.username = newUsername;
+            localStorage.setItem('chatty_mirror_user', JSON.stringify(currentUser));
+
+            // Save profile photo if changed
+            const tempPhoto = profilePhotoInput.getAttribute('data-temp-photo');
+            if (tempPhoto) {
+                localStorage.setItem(`profile_photo_${currentUser.id}`, tempPhoto);
+                profilePhotoInput.removeAttribute('data-temp-photo');
+            }
+
+            // Update UI
+            loadUserProfile();
+            
+            // Show success message
+            alert('Profile updated successfully!');
+            
+            // Close modal
+            closeEditProfileModal();
+
+            // Reload friends list to update display
+            await loadFriends();
+        } else {
+            alert(data.message || 'Failed to update profile');
+        }
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        alert('Failed to update profile. Please try again.');
+    } finally {
+        // Reset button state
+        saveProfileBtn.disabled = false;
+        saveProfileBtn.innerHTML = `
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>Save</span>
+        `;
+    }
 }
-
-window.addEventListener('beforeunload', () => {
-    if (socket) socket.disconnect();
-});
-
-window.addEventListener('online', () => {
-    console.log('Back online');
-    if (socket && !socket.connected) socket.connect();
-});
-
-window.addEventListener('offline', () => {
-    console.log('Gone offline');
-});
-
-window.addFriend = addFriend;
-window.insertEmoji = insertEmoji;
