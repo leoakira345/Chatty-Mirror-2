@@ -451,6 +451,13 @@ body {
     border-radius: 8px;
     display: block;
     object-fit: contain;
+    cursor: pointer;
+    transition: transform 0.2s, opacity 0.2s;
+}
+
+.message-image:hover {
+    transform: scale(1.02);
+    opacity: 0.9;
 }
 
 .message-video {
@@ -892,7 +899,7 @@ body {
 .mobile-menu-toggle {
     display: none;
     position: fixed;
-    bottom: 80px;  /* Changed from 20px to 80px */
+    bottom: 80px;
     right: 20px;
     width: 56px;
     height: 56px;
@@ -1428,4 +1435,65 @@ body {
         overflow: visible;
         height: auto;
     }
+}
+
+/* Image Modal for Full Screen View */
+.image-modal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    animation: fadeIn 0.3s;
+}
+
+.image-modal.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-modal-content {
+    max-width: 90%;
+    max-height: 90%;
+    object-fit: contain;
+    animation: zoomIn 0.3s;
+}
+
+.image-modal-close {
+    position: absolute;
+    top: 20px;
+    right: 35px;
+    color: #fff;
+    font-size: 40px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.image-modal-close:hover {
+    color: #bbb;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes zoomIn {
+    from { transform: scale(0.8); }
+    to { transform: scale(1); }
+}
+
+/* Make message images clickable */
+.message-image {
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.message-image:hover {
+    transform: scale(1.02);
 }
