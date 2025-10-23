@@ -13,14 +13,14 @@ const io = socketIO(server, {
         methods: ["GET", "POST"],
         credentials: true
     },
-    // Add these options for better connectivity
     transports: ['websocket', 'polling'],
-    allowEIO3: true
+    allowEIO3: true,
+    pingTimeout: 60000,
+    pingInterval: 25000
 });
 
-// Use environment variable PORT or default to 3000
 const PORT = process.env.PORT || 3000;
-const HOST = '0.0.0.0'; // Listen on all network interfaces
+const HOST = '0.0.0.0';
 
 // Middleware
 app.use(cors({
@@ -28,21 +28,22 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(express.static('public'));
 
 // Data directory
 const DATA_DIR = path.join(__dirname, 'data');
 
 // Store active users and their socket IDs
-const activeUsers = new Map(); // userId -> socketId
+const activeUsers = new Map();
 
 // Ensure data directory exists
 async function ensureDataDirectory() {
     try {
         await fs.mkdir(DATA_DIR, { recursive: true });
-        console.log('Data directory ready');
+        console.log('✅ Data directory ready');
     } catch (error) {
-        console.error('Error creating data directory:', error);
+        console.error('❌ Error creating data directory:', error);
     }
 }
 
@@ -67,7 +68,7 @@ async function writeJSON(filename, data) {
         await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
         return true;
     } catch (error) {
-        console.error('Error writing JSON:', error);
+        console.error('❌ Error writing JSON:', error);
         return false;
     }
 }
@@ -90,62 +91,150 @@ async function generateUniqueUserId() {
 
 // Socket.IO Connection
 io.on('connection', (socket) => {
-    console.log('New client connected:', socket.id);
+    console.log('🔌 New client connected:', socket.id);
 
     // User connects
     socket.on('user_connected', (userId) => {
         activeUsers.set(userId, socket.id);
-        socket.userId = userId; // Store userId on socket for easy lookup
-        console.log(`User ${userId} connected with socket ${socket.id}`);
+        socket.userId = userId;
+        console.log(`👤 User ${userId} connected with socket ${socket.id}`);
+        console.log(`📊 Total active users: ${activeUsers.size}`);
         
         // Notify friends that user is online
         socket.broadcast.emit('user_status', { userId, status: 'online' });
     });
 
-    // User sends message - FIXED VERSION
+    // User sends message - ULTRA DETAILED VERSION
     socket.on('send_message', async (data) => {
+        console.log('\n' + '='.repeat(60));
+        console.log('📨 INCOMING MESSAGE EVENT');
+        console.log('='.repeat(60));
+        
         const { senderId, receiverId, content, type } = data;
         
-        console.log(`Message from ${senderId} to ${receiverId}:`, { type, contentLength: content?.length });
+        console.log('📋 Message Details:');
+        console.log('  - From:', senderId);
+        console.log('  - To:', receiverId);
+        console.log('  - Type:', type);
+        console.log('  - Content length:', content ? content.length : 0);
+        
+        if (type === 'image' || type === 'video' || type === 'file') {
+            try {
+                const parsed = JSON.parse(content);
+                console.log('  - File name:', parsed.name);
+                console.log('  - File type:', parsed.type);
+                console.log('  - File size:', parsed.size, 'bytes');
+                console.log('  - Data length:', parsed.data ? parsed.data.length : 0);
+            } catch (e) {
+                console.log('  - Could not parse file data');
+            }
+        } else {
+            console.log('  - Text preview:', content ? content.substring(0, 50) : 'empty');
+        }
         
         try {
+            // Validate required fields
+            if (!senderId) {
+                throw new Error('Missing senderId');
+            }
+            if (!receiverId) {
+                throw new Error('Missing receiverId');
+            }
+            if (!content) {
+                throw new Error('Missing content');
+            }
+            if (!type) {
+                throw new Error('Missing type');
+            }
+
+            console.log('✅ Validation passed');
+
             // Create consistent chat ID (sorted IDs)
             const chatId = [senderId, receiverId].sort().join('_');
+            console.log('💾 Chat ID:', chatId);
             
-            // Create complete message object with ALL required fields
+            // Create complete message object
             const message = {
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                 senderId: senderId,
-                receiverId: receiverId, // IMPORTANT: Include receiverId
+                receiverId: receiverId,
                 content: content,
                 type: type,
                 timestamp: Date.now()
             };
             
+            console.log('📝 Message ID:', message.id);
+            
             // Load existing messages
-            let messagesData = await readJSON(`messages_${chatId}.json`) || { messages: [] };
-            messagesData.messages.push(message);
+            let messagesData = await readJSON(`messages_${chatId}.json`);
+            console.log('📂 Existing messages:', messagesData ? messagesData.messages.length : 0);
             
-            // Save messages
-            await writeJSON(`messages_${chatId}.json`, messagesData);
-            
-            console.log(`Message saved: ${message.id}`);
-            
-            // Send to sender (confirmation)
-            socket.emit('message_sent', { success: true, message });
-            
-            // Send to receiver if online - with complete message object
-            const receiverSocketId = activeUsers.get(receiverId);
-            if (receiverSocketId) {
-                io.to(receiverSocketId).emit('new_message', message);
-                console.log(`Message delivered to ${receiverId} (socket: ${receiverSocketId})`);
-            } else {
-                console.log(`Receiver ${receiverId} is offline - message will be delivered when they connect`);
+            if (!messagesData) {
+                messagesData = { messages: [] };
+                console.log('📂 Creating new messages file');
             }
             
+            // Ensure messages array exists
+            if (!Array.isArray(messagesData.messages)) {
+                console.log('⚠️  Messages was not an array, creating new array');
+                messagesData.messages = [];
+            }
+            
+            // Add new message
+            messagesData.messages.push(message);
+            console.log('📊 Total messages in chat:', messagesData.messages.length);
+            
+            // Save messages to file
+            const saved = await writeJSON(`messages_${chatId}.json`, messagesData);
+            
+            if (!saved) {
+                throw new Error('Failed to save message to file');
+            }
+            
+            console.log('✅ Message saved to file successfully');
+            
+            // Send confirmation to sender
+            socket.emit('message_sent', { 
+                success: true, 
+                message: message 
+            });
+            console.log('✅ Confirmation sent to sender:', senderId);
+            
+            // Check if receiver is online
+            const receiverSocketId = activeUsers.get(receiverId);
+            console.log('🔍 Looking for receiver:', receiverId);
+            console.log('🔍 Receiver socket ID:', receiverSocketId || 'NOT FOUND');
+            console.log('🔍 Active users:', Array.from(activeUsers.keys()).join(', '));
+            
+            if (receiverSocketId) {
+                // Emit to receiver
+                io.to(receiverSocketId).emit('new_message', message);
+                console.log('✅ Message emitted to receiver socket:', receiverSocketId);
+                
+                // Verify the socket exists
+                const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+                if (receiverSocket) {
+                    console.log('✅ Receiver socket is connected and active');
+                } else {
+                    console.log('⚠️  Receiver socket ID exists in map but socket not found');
+                }
+            } else {
+                console.log('💤 Receiver is offline - message saved for later delivery');
+            }
+            
+            console.log('='.repeat(60));
+            console.log('✅ MESSAGE PROCESSING COMPLETE');
+            console.log('='.repeat(60) + '\n');
+            
         } catch (error) {
-            console.error('Error handling message:', error);
-            socket.emit('message_sent', { success: false, error: error.message });
+            console.error('❌ ERROR HANDLING MESSAGE:');
+            console.error('  -', error.message);
+            console.error('  - Stack:', error.stack);
+            socket.emit('message_sent', { 
+                success: false, 
+                error: error.message 
+            });
+            console.log('='.repeat(60) + '\n');
         }
     });
 
@@ -155,6 +244,7 @@ io.on('connection', (socket) => {
         const receiverSocketId = activeUsers.get(receiverId);
         if (receiverSocketId) {
             io.to(receiverSocketId).emit('user_typing', { userId: senderId });
+            console.log(`⌨️  ${senderId} is typing to ${receiverId}`);
         }
     });
 
@@ -169,7 +259,6 @@ io.on('connection', (socket) => {
 
     // User disconnects
     socket.on('disconnect', () => {
-        // Find and remove user from active users
         let disconnectedUserId = null;
         for (const [userId, socketId] of activeUsers.entries()) {
             if (socketId === socket.id) {
@@ -180,9 +269,20 @@ io.on('connection', (socket) => {
         }
         
         if (disconnectedUserId) {
-            console.log(`User ${disconnectedUserId} disconnected`);
-            socket.broadcast.emit('user_status', { userId: disconnectedUserId, status: 'offline' });
+            console.log(`👋 User ${disconnectedUserId} disconnected`);
+            console.log(`📊 Total active users: ${activeUsers.size}`);
+            socket.broadcast.emit('user_status', { 
+                userId: disconnectedUserId, 
+                status: 'offline' 
+            });
+        } else {
+            console.log(`👋 Unknown socket ${socket.id} disconnected`);
         }
+    });
+
+    // Error handling
+    socket.on('error', (error) => {
+        console.error('❌ Socket error:', error);
     });
 });
 
@@ -193,6 +293,8 @@ app.get('/', (req, res) => {
     res.json({
         success: true,
         message: 'Chatty Mirror Server is running',
+        version: '2.0-debug',
+        activeUsers: activeUsers.size,
         endpoints: {
             health: '/api/health',
             initUser: '/api/user/init',
@@ -211,17 +313,19 @@ app.post('/api/user/init', async (req, res) => {
         const user = {
             id: userId,
             username: `User${userId}`,
+            profilePhoto: null,
             createdAt: Date.now()
         };
         
         await writeJSON(`user_${userId}.json`, user);
+        console.log(`👤 New user created: ${userId}`);
         
         res.json({
             success: true,
             user: user
         });
     } catch (error) {
-        console.error('Error initializing user:', error);
+        console.error('❌ Error initializing user:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to initialize user'
@@ -244,9 +348,19 @@ app.get('/api/user/:userId', async (req, res) => {
         const user = await readJSON(`user_${userId}.json`);
         
         if (user) {
+            if (!user.hasOwnProperty('profilePhoto')) {
+                user.profilePhoto = null;
+            }
+            
             res.json({
                 success: true,
-                user: user
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    profilePhoto: user.profilePhoto || null,
+                    createdAt: user.createdAt,
+                    updatedAt: user.updatedAt
+                }
             });
         } else {
             res.json({
@@ -255,7 +369,7 @@ app.get('/api/user/:userId', async (req, res) => {
             });
         }
     } catch (error) {
-        console.error('Error getting user:', error);
+        console.error('❌ Error getting user:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to get user'
@@ -263,28 +377,18 @@ app.get('/api/user/:userId', async (req, res) => {
     }
 });
 
-// Update user profile (NEW ENDPOINT)
+// Update user profile
 app.post('/api/user/update', async (req, res) => {
     try {
-        const { userId, username } = req.body;
+        const { userId, username, profilePhoto } = req.body;
 
-        // Validate required fields
-        if (!userId || !username) {
+        if (!userId) {
             return res.json({ 
                 success: false, 
-                message: 'User ID and username are required' 
+                message: 'User ID is required' 
             });
         }
 
-        // Validate username length
-        if (username.length < 2 || username.length > 25) {
-            return res.json({ 
-                success: false, 
-                message: 'Username must be between 2 and 25 characters' 
-            });
-        }
-
-        // Validate user ID format
         if (!/^\d{4}$/.test(userId)) {
             return res.json({
                 success: false,
@@ -292,7 +396,6 @@ app.post('/api/user/update', async (req, res) => {
             });
         }
 
-        // Check if user exists
         const user = await readJSON(`user_${userId}.json`);
         
         if (!user) {
@@ -302,19 +405,37 @@ app.post('/api/user/update', async (req, res) => {
             });
         }
 
-        // Update username
-        user.username = username;
+        if (username !== undefined) {
+            if (username.length < 2 || username.length > 25) {
+                return res.json({ 
+                    success: false, 
+                    message: 'Username must be between 2 and 25 characters' 
+                });
+            }
+            user.username = username;
+        }
+
+        if (profilePhoto !== undefined) {
+            user.profilePhoto = profilePhoto;
+            console.log(`📸 Profile photo updated for user ${userId}`);
+        }
+
         user.updatedAt = Date.now();
 
-        // Save updated user data
         const saved = await writeJSON(`user_${userId}.json`, user);
 
         if (saved) {
-            console.log(`Profile updated for user ${userId}: ${username}`);
+            console.log(`✅ Profile updated for user ${userId}`);
             
             res.json({ 
                 success: true, 
-                user: user,
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    profilePhoto: user.profilePhoto || null,
+                    createdAt: user.createdAt,
+                    updatedAt: user.updatedAt
+                },
                 message: 'Profile updated successfully' 
             });
         } else {
@@ -325,7 +446,7 @@ app.post('/api/user/update', async (req, res) => {
         }
 
     } catch (error) {
-        console.error('Error updating user profile:', error);
+        console.error('❌ Error updating user profile:', error);
         res.status(500).json({ 
             success: false, 
             message: 'Server error while updating profile' 
@@ -350,9 +471,14 @@ app.get('/api/friends/:userId', async (req, res) => {
         for (const friendId of friendsData.friendIds) {
             const friend = await readJSON(`user_${friendId}.json`);
             if (friend) {
-                // Add online status
-                friend.isOnline = activeUsers.has(friendId);
-                friends.push(friend);
+                friends.push({
+                    id: friend.id,
+                    username: friend.username,
+                    profilePhoto: friend.profilePhoto || null,
+                    isOnline: activeUsers.has(friendId),
+                    createdAt: friend.createdAt,
+                    updatedAt: friend.updatedAt
+                });
             }
         }
         
@@ -361,7 +487,7 @@ app.get('/api/friends/:userId', async (req, res) => {
             friends: friends
         });
     } catch (error) {
-        console.error('Error getting friends:', error);
+        console.error('❌ Error getting friends:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to get friends'
@@ -381,7 +507,6 @@ app.post('/api/friends/add', async (req, res) => {
             });
         }
         
-        // Check if friend exists
         const friendUser = await readJSON(`user_${friendId}.json`);
         if (!friendUser) {
             return res.json({
@@ -390,21 +515,18 @@ app.post('/api/friends/add', async (req, res) => {
             });
         }
         
-        // Add friend to user's list
         let userFriends = await readJSON(`friends_${userId}.json`) || { friendIds: [] };
         if (!userFriends.friendIds.includes(friendId)) {
             userFriends.friendIds.push(friendId);
             await writeJSON(`friends_${userId}.json`, userFriends);
         }
         
-        // Add user to friend's list (bidirectional)
         let friendFriends = await readJSON(`friends_${friendId}.json`) || { friendIds: [] };
         if (!friendFriends.friendIds.includes(userId)) {
             friendFriends.friendIds.push(userId);
             await writeJSON(`friends_${friendId}.json`, friendFriends);
         }
         
-        // Notify both users via socket
         const userSocketId = activeUsers.get(userId);
         const friendSocketId = activeUsers.get(friendId);
         
@@ -415,12 +537,14 @@ app.post('/api/friends/add', async (req, res) => {
             io.to(friendSocketId).emit('friend_added', { friendId: userId });
         }
         
+        console.log(`👥 Friend added: ${userId} <-> ${friendId}`);
+        
         res.json({
             success: true,
             message: 'Friend added successfully'
         });
     } catch (error) {
-        console.error('Error adding friend:', error);
+        console.error('❌ Error adding friend:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to add friend'
@@ -433,17 +557,18 @@ app.get('/api/messages/:userId1/:userId2', async (req, res) => {
     try {
         const { userId1, userId2 } = req.params;
         
-        // Create consistent chat ID (sorted IDs)
         const chatId = [userId1, userId2].sort().join('_');
         
         const messagesData = await readJSON(`messages_${chatId}.json`);
+        
+        console.log(`📬 Loading messages for chat ${chatId}: ${messagesData?.messages?.length || 0} messages`);
         
         res.json({
             success: true,
             messages: messagesData?.messages || []
         });
     } catch (error) {
-        console.error('Error getting messages:', error);
+        console.error('❌ Error getting messages:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to get messages'
@@ -451,7 +576,7 @@ app.get('/api/messages/:userId1/:userId2', async (req, res) => {
     }
 });
 
-// Send message (fallback API - Socket.IO is preferred)
+// Send message (fallback API)
 app.post('/api/messages/send', async (req, res) => {
     try {
         const { senderId, receiverId, content, type } = req.body;
@@ -463,37 +588,36 @@ app.post('/api/messages/send', async (req, res) => {
             });
         }
         
-        // Create consistent chat ID (sorted IDs)
         const chatId = [senderId, receiverId].sort().join('_');
         
         const message = {
             id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
             senderId: senderId,
-            receiverId: receiverId, // Include receiverId
+            receiverId: receiverId,
             content: content,
             type: type,
             timestamp: Date.now()
         };
         
-        // Load existing messages
         let messagesData = await readJSON(`messages_${chatId}.json`) || { messages: [] };
         messagesData.messages.push(message);
         
-        // Save messages
         await writeJSON(`messages_${chatId}.json`, messagesData);
         
-        // Notify receiver via socket if online
         const receiverSocketId = activeUsers.get(receiverId);
         if (receiverSocketId) {
             io.to(receiverSocketId).emit('new_message', message);
         }
         
+        console.log(`📨 Message sent via API from ${senderId} to ${receiverId}`);
+        
         res.json({
             success: true,
-            message: 'Message sent successfully'
+            message: 'Message sent successfully',
+            data: message
         });
     } catch (error) {
-        console.error('Error sending message:', error);
+        console.error('❌ Error sending message:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to send message'
@@ -519,12 +643,13 @@ app.delete('/api/data/reset', async (req, res) => {
         for (const file of files) {
             await fs.unlink(path.join(DATA_DIR, file));
         }
+        console.log('🗑️  All data deleted');
         res.json({
             success: true,
             message: 'All data deleted'
         });
     } catch (error) {
-        console.error('Error resetting data:', error);
+        console.error('❌ Error resetting data:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to reset data'
@@ -538,32 +663,33 @@ app.get('/api/health', (req, res) => {
         success: true,
         message: 'Server is running',
         activeUsers: activeUsers.size,
+        activeUserIds: Array.from(activeUsers.keys()),
         timestamp: Date.now(),
         port: PORT
     });
 });
 
-// Start server - FIXED to listen on all interfaces
+// Start server
 async function startServer() {
     await ensureDataDirectory();
     
     server.listen(PORT, HOST, () => {
-        console.log('=================================');
-        console.log('  Chatty Mirror Server Started');
-        console.log('  WITH SOCKET.IO REAL-TIME');
-        console.log('=================================');
-        console.log(`  Server: http://localhost:${PORT}`);
-        console.log(`  API: http://localhost:${PORT}/api`);
-        console.log(`  WebSocket: ws://localhost:${PORT}`);
-        console.log(`  Host: ${HOST} (All network interfaces)`);
-        console.log('=================================');
-        console.log('  Local access: http://localhost:' + PORT);
-        console.log('  Network access: http://YOUR_IP:' + PORT);
-        console.log('  (Find your IP with: ipconfig or ifconfig)');
-        console.log('=================================');
-        console.log('  Server is ready to accept connections');
-        console.log('  Press Ctrl+C to stop');
-        console.log('=================================');
+        console.log('\n' + '='.repeat(60));
+        console.log('  🚀 CHATTY MIRROR SERVER - DEBUG MODE');
+        console.log('='.repeat(60));
+        console.log(`  ✅ Server: http://localhost:${PORT}`);
+        console.log(`  ✅ API: http://localhost:${PORT}/api`);
+        console.log(`  ✅ WebSocket: ws://localhost:${PORT}`);
+        console.log(`  ✅ Host: ${HOST} (All network interfaces)`);
+        console.log('='.repeat(60));
+        console.log('  📍 Local access: http://localhost:' + PORT);
+        console.log('  📍 Network access: http://YOUR_IP:' + PORT);
+        console.log('  💡 Find your IP with: ipconfig or ifconfig');
+        console.log('='.repeat(60));
+        console.log('  ⚡ Extensive logging enabled');
+        console.log('  📊 Monitor console for detailed message flow');
+        console.log('  🔍 Each message will show full processing details');
+        console.log('='.repeat(60) + '\n');
     });
 }
 
