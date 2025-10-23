@@ -86,6 +86,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initializeSocket();
     setupMobileMenu();
     setupSettingsModal();
+    setupImageModal();
 });
 
 async function initializeApp() {
@@ -97,12 +98,21 @@ async function initializeApp() {
             console.log('Loaded existing user:', currentUser.id);
             currentUserIdEl.textContent = currentUser.id;
 
-            const verifyResponse = await fetch(`${API_URL}/user/${currentUser.id}`);
-            const verifyData = await verifyResponse.json();
+            try {
+                const verifyResponse = await fetch(`${API_URL}/user/${currentUser.id}`);
+                const verifyData = await verifyResponse.json();
 
-            if (!verifyData.success || !verifyData.user) {
-                console.log('User not found on server, creating new user');
-                await createNewUser();
+                if (verifyData.success && verifyData.user) {
+                    // Update local user data with server data
+                    currentUser = verifyData.user;
+                    localStorage.setItem('chatty_mirror_user', JSON.stringify(currentUser));
+                    console.log('User verified and synced:', currentUser.id);
+                } else {
+                    console.log('User not found on server, keeping local user');
+                }
+            } catch (verifyError) {
+                console.error('Error verifying user:', verifyError);
+                console.log('Keeping local user due to verification error');
             }
         } else {
             await createNewUser();
@@ -193,7 +203,13 @@ function initializeSocket() {
     });
 
     socket.on('new_message', (message) => {
-        console.log('📨 New message:', message);
+        console.log('📨 New message received:', {
+            id: message.id,
+            type: message.type,
+            from: message.senderId,
+            to: message.receiverId,
+            contentLength: message.content?.length
+        });
 
         const isRelevant = selectedFriend && (
             (message.senderId === selectedFriend.id && message.receiverId === currentUser.id) ||
@@ -364,6 +380,7 @@ async function loadFriends() {
 
         if (data.success) {
             friends = data.friends;
+            console.log('Friends loaded:', friends);
             renderFriends();
         }
     } catch (error) {
@@ -388,18 +405,27 @@ function renderFriends() {
         return;
     }
 
-    friendsList.innerHTML = friends.map(friend => `
-        <div class="friend-item ${selectedFriend?.id === friend.id ? 'active' : ''}" data-friend-id="${friend.id}">
-            <div class="avatar-container">
-                <div class="avatar">${friend.username[0].toUpperCase()}</div>
-                ${friend.isOnline ? '<span class="online-indicator online"></span>' : '<span class="online-indicator"></span>'}
+    friendsList.innerHTML = friends.map(friend => {
+        let avatarContent;
+        if (friend.profilePhoto) {
+            avatarContent = `<img src="${friend.profilePhoto}" alt="${escapeHtml(friend.username)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+        } else {
+            avatarContent = friend.username[0].toUpperCase();
+        }
+        
+        return `
+            <div class="friend-item ${selectedFriend?.id === friend.id ? 'active' : ''}" data-friend-id="${friend.id}">
+                <div class="avatar-container">
+                    <div class="avatar">${avatarContent}</div>
+                    ${friend.isOnline ? '<span class="online-indicator online"></span>' : '<span class="online-indicator"></span>'}
+                </div>
+                <div class="friend-info">
+                    <p class="friend-name">${escapeHtml(friend.username)}</p>
+                    <p class="friend-id">ID: ${friend.id}</p>
+                </div>
             </div>
-            <div class="friend-info">
-                <p class="friend-name">${escapeHtml(friend.username)}</p>
-                <p class="friend-id">ID: ${friend.id}</p>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 
     document.querySelectorAll('.friend-item').forEach(item => {
         item.addEventListener('click', () => {
@@ -415,7 +441,13 @@ function selectFriend(friendId) {
         noChatSelected.style.display = 'none';
         chatContainer.style.display = 'flex';
 
-        chatAvatar.textContent = selectedFriend.username[0].toUpperCase();
+        // Show profile photo or initial in chat header
+        if (selectedFriend.profilePhoto) {
+            chatAvatar.innerHTML = `<img src="${selectedFriend.profilePhoto}" alt="${escapeHtml(selectedFriend.username)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+        } else {
+            chatAvatar.innerHTML = selectedFriend.username[0].toUpperCase();
+        }
+        
         chatFriendName.textContent = selectedFriend.username;
         chatFriendId.textContent = `ID: ${selectedFriend.id}`;
 
@@ -438,7 +470,6 @@ function updateOnlineStatus(isOnline) {
 async function searchUser() {
     const userId = searchInput.value.trim();
 
-    // Validate input
     if (!userId || userId.length !== 4) {
         alert('Please enter a valid 4-digit ID');
         return;
@@ -449,7 +480,6 @@ async function searchUser() {
         return;
     }
 
-    // Show loading state
     searchBtn.disabled = true;
     searchBtn.innerHTML = `
         <svg class="icon animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -458,27 +488,8 @@ async function searchUser() {
     `;
 
     try {
-        console.log('Searching for user:', userId);
-        console.log('API URL:', `${API_URL}/user/${userId}`);
-        
-        const response = await fetch(`${API_URL}/user/${userId}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-
-        console.log('Response status:', response.status);
-        console.log('Response ok:', response.ok);
-
-        // Check if response is ok
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        // Parse JSON
+        const response = await fetch(`${API_URL}/user/${userId}`);
         const data = await response.json();
-        console.log('Response data:', data);
 
         if (data.success && data.user) {
             const isFriend = friends.some(f => f.id === data.user.id);
@@ -489,23 +500,9 @@ async function searchUser() {
         }
     } catch (error) {
         console.error('Error searching user:', error);
-        console.error('Error details:', {
-            message: error.message,
-            stack: error.stack
-        });
-        
-        // More specific error messages
-        if (error.message.includes('Failed to fetch')) {
-            alert('Cannot connect to server. Please check your connection and try again.');
-        } else if (error.message.includes('HTTP error')) {
-            alert(`Server error: ${error.message}. Please try again later.`);
-        } else {
-            alert('Failed to search user. Please try again.');
-        }
-        
+        alert('Failed to search user. Please try again.');
         searchResult.style.display = 'none';
     } finally {
-        // Reset button state
         searchBtn.disabled = false;
         searchBtn.innerHTML = `
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -517,10 +514,17 @@ async function searchUser() {
 }
 
 function displaySearchResult(user, isFriend) {
+    let avatarContent;
+    if (user.profilePhoto) {
+        avatarContent = `<img src="${user.profilePhoto}" alt="${escapeHtml(user.username)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+    } else {
+        avatarContent = user.username[0].toUpperCase();
+    }
+    
     searchResult.style.display = 'block';
     searchResult.innerHTML = `
         <div class="search-result-content">
-            <div class="avatar">${user.username[0].toUpperCase()}</div>
+            <div class="avatar">${avatarContent}</div>
             <div class="friend-info">
                 <p class="friend-name">${escapeHtml(user.username)}</p>
                 <p class="friend-id">ID: ${user.id}</p>
@@ -599,7 +603,12 @@ function renderMessages() {
             return `
                 <div class="message ${isOwn ? 'own' : ''}">
                     <div class="message-content">
-                        <img src="${fileData.data}" alt="${escapeHtml(fileData.name)}" class="message-image" loading="lazy">
+                        <img src="${fileData.data}" 
+                             alt="${escapeHtml(fileData.name)}" 
+                             class="message-image" 
+                             loading="lazy"
+                             data-image-src="${fileData.data}"
+                             data-image-name="${escapeHtml(fileData.name)}">
                         <p style="font-size: 0.75rem; margin-top: 0.5rem; opacity: 0.8;">${escapeHtml(fileData.name)}</p>
                     </div>
                 </div>
@@ -647,6 +656,16 @@ function renderMessages() {
             </div>
         `;
     }).join('');
+
+    // Add click event listeners to all images after rendering
+    const messageImages = messagesArea.querySelectorAll('.message-image');
+    messageImages.forEach(img => {
+        img.addEventListener('click', function() {
+            const imageSrc = this.getAttribute('data-image-src') || this.src;
+            const imageName = this.getAttribute('data-image-name') || '';
+            openImageModal(imageSrc, imageName);
+        });
+    });
 }
 
 function scrollToBottom() {
@@ -733,6 +752,18 @@ async function handleFileUpload(e) {
             messageType = 'video';
         }
 
+        console.log('🚀 PREPARING TO SEND FILE:', {
+            fileName: fileData.name,
+            fileType: fileData.type,
+            fileSize: fileData.size,
+            messageType: messageType,
+            senderId: currentUser.id,
+            receiverId: selectedFriend.id,
+            socketConnected: socket?.connected,
+            socketId: socket?.id,
+            dataLength: fileData.data.length
+        });
+
         const tempMessage = {
             id: 'temp_' + Date.now() + Math.random().toString(36).substr(2, 9),
             senderId: currentUser.id,
@@ -746,12 +777,22 @@ async function handleFileUpload(e) {
         renderMessages();
         scrollToBottom();
 
+        console.log('🚀 EMITTING send_message event to server');
+        console.log('📦 Message payload:', {
+            senderId: currentUser.id,
+            receiverId: selectedFriend.id,
+            type: messageType,
+            contentLength: JSON.stringify(fileData).length
+        });
+
         socket.emit('send_message', {
             senderId: currentUser.id,
             receiverId: selectedFriend.id,
             content: JSON.stringify(fileData),
             type: messageType
         });
+
+        console.log('✅ send_message event emitted successfully');
 
         fileInput.value = '';
     };
@@ -876,7 +917,10 @@ function setupSettingsModal() {
     // Close modals on Escape key
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-            if (editProfileModal.style.display === 'flex') {
+            const imageModal = document.getElementById('imageModal');
+            if (imageModal && imageModal.classList.contains('active')) {
+                imageModal.classList.remove('active');
+            } else if (editProfileModal.style.display === 'flex') {
                 closeEditProfileModal();
             } else if (settingsModal.style.display === 'flex') {
                 closeSettingsModal();
@@ -912,10 +956,9 @@ function loadUserProfile() {
     // Load username
     usernameInput.value = currentUser.username || '';
 
-    // Load profile photo if exists
-    const savedPhoto = localStorage.getItem(`profile_photo_${currentUser.id}`);
-    if (savedPhoto) {
-        profilePhotoImg.src = savedPhoto;
+    // Load profile photo from server data
+    if (currentUser.profilePhoto) {
+        profilePhotoImg.src = currentUser.profilePhoto;
         profilePhotoImg.style.display = 'block';
         profilePhotoInitial.style.display = 'none';
     } else {
@@ -993,7 +1036,11 @@ async function saveProfile() {
             <span>Saving...</span>
         `;
 
-        // Update username on server
+        // Get profile photo data if changed
+        const tempPhoto = profilePhotoInput.getAttribute('data-temp-photo');
+        const profilePhoto = tempPhoto || currentUser.profilePhoto || null;
+
+        // Update profile on server
         const response = await fetch(`${API_URL}/user/update`, {
             method: 'POST',
             headers: {
@@ -1001,7 +1048,8 @@ async function saveProfile() {
             },
             body: JSON.stringify({
                 userId: currentUser.id,
-                username: newUsername
+                username: newUsername,
+                profilePhoto: profilePhoto
             })
         });
 
@@ -1010,12 +1058,11 @@ async function saveProfile() {
         if (data.success) {
             // Update local user object
             currentUser.username = newUsername;
+            currentUser.profilePhoto = profilePhoto;
             localStorage.setItem('chatty_mirror_user', JSON.stringify(currentUser));
 
-            // Save profile photo if changed
-            const tempPhoto = profilePhotoInput.getAttribute('data-temp-photo');
+            // Clear temp photo attribute
             if (tempPhoto) {
-                localStorage.setItem(`profile_photo_${currentUser.id}`, tempPhoto);
                 profilePhotoInput.removeAttribute('data-temp-photo');
             }
 
@@ -1030,6 +1077,11 @@ async function saveProfile() {
 
             // Reload friends list to update display
             await loadFriends();
+            
+            // If in a chat, refresh the chat view
+            if (selectedFriend) {
+                renderFriends();
+            }
         } else {
             alert(data.message || 'Failed to update profile');
         }
@@ -1047,3 +1099,63 @@ async function saveProfile() {
         `;
     }
 }
+
+// ==========================================
+// IMAGE MODAL FUNCTIONALITY
+// ==========================================
+function setupImageModal() {
+    const modal = document.getElementById('imageModal');
+    const closeBtn = document.querySelector('.image-modal-close');
+    const modalImg = document.getElementById('modalImage');
+
+    if (!modal || !closeBtn || !modalImg) {
+        console.error('❌ Image modal elements not found in HTML');
+        return;
+    }
+
+    console.log('✅ Image modal found and setting up...');
+
+    // Close modal when clicking X
+    closeBtn.addEventListener('click', () => {
+        modal.classList.remove('active');
+        console.log('Modal closed via X button');
+    });
+
+    // Close modal when clicking outside image
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.remove('active');
+            console.log('Modal closed via backdrop click');
+        }
+    });
+
+    console.log('✅ Image modal setup complete');
+}
+
+// Function to open image in full screen
+function openImageModal(imageSrc, imageName = '') {
+    console.log('🖼️ Opening image modal:', { 
+        imageSrc: imageSrc.substring(0, 50) + '...', 
+        imageName 
+    });
+    
+    const modal = document.getElementById('imageModal');
+    const modalImg = document.getElementById('modalImage');
+
+    if (modal && modalImg) {
+        modalImg.src = imageSrc;
+        modalImg.alt = imageName || 'Full size image';
+        modal.classList.add('active');
+        console.log('✅ Modal opened successfully');
+    } else {
+        console.error('❌ Modal elements not found:', { 
+            modal: !!modal, 
+            modalImg: !!modalImg 
+        });
+    }
+}
+
+// Make functions globally accessible
+window.addFriend = addFriend;
+window.insertEmoji = insertEmoji;
+window.openImageModal = openImageModal;
