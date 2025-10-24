@@ -27,6 +27,28 @@ let messages = [];
 let typingTimeout = null;
 
 // ==========================================
+// KARAOKE STATE
+// ==========================================
+let youtubePlayer = null;
+let mediaRecorder = null;
+let audioChunks = [];
+let recordedBlob = null;
+let micStream = null;
+let desktopStream = null;
+let recordingStartTime = null;
+let recordingInterval = null;
+let selectedVideoId = null;
+let audioContext = null;
+let mediaStreamDestination = null;
+
+// YouTube API Ready
+let youtubeAPIReady = false;
+window.onYouTubeIframeAPIReady = function() {
+    youtubeAPIReady = true;
+    console.log('✅ YouTube API Ready');
+};
+
+// ==========================================
 // EMOJIS
 // ==========================================
 const emojis = ['😀', '😂', '😍', '🥰', '😎', '🤔', '👍', '❤️', '🔥', '✨', '🎉', '💯', '😊', '🙌', '💪', '🌟'];
@@ -76,6 +98,25 @@ const profilePhotoInitial = document.getElementById('profilePhotoInitial');
 const usernameInput = document.getElementById('usernameInput');
 const saveProfileBtn = document.getElementById('saveProfileBtn');
 
+// Karaoke Modal Elements
+const karaokeBtn = document.getElementById('karaokeBtn');
+const karaokeModal = document.getElementById('karaokeModal');
+const karaokeOverlay = document.getElementById('karaokeOverlay');
+const closeKaraokeBtn = document.getElementById('closeKaraokeBtn');
+const youtubeSearchInput = document.getElementById('youtubeSearchInput');
+const youtubeSearchBtn = document.getElementById('youtubeSearchBtn');
+const youtubeResults = document.getElementById('youtubeResults');
+const karaokePlayerSection = document.getElementById('karaokePlayerSection');
+const startRecordBtn = document.getElementById('startRecordBtn');
+const stopRecordBtn = document.getElementById('stopRecordBtn');
+const recordingIndicator = document.getElementById('recordingIndicator');
+const recordingTimer = document.getElementById('recordingTimer');
+const recordedAudioPreview = document.getElementById('recordedAudioPreview');
+const recordedAudio = document.getElementById('recordedAudio');
+const sendRecordingBtn = document.getElementById('sendRecordingBtn');
+const countdownOverlay = document.getElementById('countdownOverlay');
+const countdownNumber = document.getElementById('countdownNumber');
+
 // ==========================================
 // INITIALIZE
 // ==========================================
@@ -87,6 +128,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupMobileMenu();
     setupSettingsModal();
     setupImageModal();
+    setupKaraokeModal();
 });
 
 async function initializeApp() {
@@ -103,7 +145,6 @@ async function initializeApp() {
                 const verifyData = await verifyResponse.json();
 
                 if (verifyData.success && verifyData.user) {
-                    // Update local user data with server data
                     currentUser = verifyData.user;
                     localStorage.setItem('chatty_mirror_user', JSON.stringify(currentUser));
                     console.log('User verified and synced:', currentUser.id);
@@ -183,6 +224,7 @@ function initializeSocket() {
         connectionStatus.title = 'Connected';
 
         if (currentUser) {
+            console.log('Emitting user_connected for:', currentUser.id);
             socket.emit('user_connected', currentUser.id);
         }
     });
@@ -226,6 +268,10 @@ function initializeSocket() {
                 messages.push(message);
                 renderMessages();
                 scrollToBottom();
+                
+                if (message.senderId === selectedFriend.id) {
+                    markMessageAsSeen(message.id);
+                }
             }
         }
 
@@ -237,11 +283,19 @@ function initializeSocket() {
     });
 
     socket.on('message_sent', (data) => {
+        console.log('📤 Message sent response:', data);
+        
         if (data.success) {
-            console.log('✅ Message sent:', data.message.id);
+            console.log('✅ Message sent successfully:', data.message.id);
+            
+            const tempIndex = messages.findIndex(m => m.id.startsWith('temp_'));
+            if (tempIndex !== -1) {
+                messages[tempIndex] = data.message;
+                renderMessages();
+            }
         } else {
             console.error('❌ Send failed:', data.error);
-            alert('Failed to send message.');
+            alert('Failed to send message: ' + (data.error || 'Unknown error'));
             if (messages.length > 0 && messages[messages.length - 1].id.startsWith('temp_')) {
                 messages.pop();
                 renderMessages();
@@ -277,9 +331,33 @@ function initializeSocket() {
         }
     });
 
+    socket.on('message_seen', (data) => {
+        console.log('👁️ Message seen:', data.messageId);
+        
+        const message = messages.find(m => m.id === data.messageId);
+        if (message) {
+            message.status = 'seen';
+            renderMessages();
+        }
+    });
+
     socket.on('connect_error', (error) => {
         console.error('❌ Connection error:', error.message);
         connectionStatus.style.color = '#ef4444';
+        connectionStatus.title = 'Connection Error';
+    });
+
+    socket.on('error', (error) => {
+        console.error('❌ Socket error:', error);
+    });
+}
+
+function markMessageAsSeen(messageId) {
+    if (!socket || !socket.connected) return;
+    
+    socket.emit('mark_seen', {
+        messageId: messageId,
+        userId: currentUser.id
     });
 }
 
@@ -298,6 +376,8 @@ function showNotification(message) {
                 body = '🎥 Sent a video';
             } else if (message.type === 'file') {
                 body = '📎 Sent a file';
+            } else if (message.type === 'audio') {
+                body = '🎤 Sent a voice message';
             }
 
             new Notification(`${friendName} - Chatty Mirror`, {
@@ -360,6 +440,26 @@ function setupEventListeners() {
         if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
             emojiPicker.style.display = 'none';
         }
+    });
+
+    window.addEventListener('focus', () => {
+        if (selectedFriend) {
+            markAllMessagesAsSeen();
+        }
+    });
+}
+
+function markAllMessagesAsSeen() {
+    if (!selectedFriend || !socket || !socket.connected) return;
+    
+    const unseenMessages = messages.filter(m => 
+        m.senderId === selectedFriend.id && 
+        m.receiverId === currentUser.id &&
+        m.status !== 'seen'
+    );
+    
+    unseenMessages.forEach(msg => {
+        markMessageAsSeen(msg.id);
     });
 }
 
@@ -441,7 +541,6 @@ function selectFriend(friendId) {
         noChatSelected.style.display = 'none';
         chatContainer.style.display = 'flex';
 
-        // Show profile photo or initial in chat header
         if (selectedFriend.profilePhoto) {
             chatAvatar.innerHTML = `<img src="${selectedFriend.profilePhoto}" alt="${escapeHtml(selectedFriend.username)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
         } else {
@@ -583,6 +682,7 @@ async function loadMessages() {
             messages = data.messages;
             renderMessages();
             scrollToBottom();
+            markAllMessagesAsSeen();
         }
     } catch (error) {
         console.error('Error loading messages:', error);
@@ -597,6 +697,7 @@ function renderMessages() {
 
     messagesArea.innerHTML = messages.map(msg => {
         const isOwn = msg.senderId === currentUser.id;
+        const messageStatus = getMessageStatus(msg, isOwn);
 
         if (msg.type === 'image') {
             const fileData = JSON.parse(msg.content);
@@ -609,7 +710,10 @@ function renderMessages() {
                              loading="lazy"
                              data-image-src="${fileData.data}"
                              data-image-name="${escapeHtml(fileData.name)}">
-                        <p style="font-size: 0.75rem; margin-top: 0.5rem; opacity: 0.8;">${escapeHtml(fileData.name)}</p>
+                        <p style="font-size: 0.75rem; margin-top: 0.5rem; opacity: 0.8;">
+                            ${escapeHtml(fileData.name)}
+                            ${messageStatus}
+                        </p>
                     </div>
                 </div>
             `;
@@ -621,7 +725,32 @@ function renderMessages() {
                 <div class="message ${isOwn ? 'own' : ''}">
                     <div class="message-content">
                         <video src="${fileData.data}" controls class="message-video" preload="metadata"></video>
-                        <p style="font-size: 0.75rem; margin-top: 0.5rem; opacity: 0.8;">${escapeHtml(fileData.name)}</p>
+                        <p style="font-size: 0.75rem; margin-top: 0.5rem; opacity: 0.8;">
+                            ${escapeHtml(fileData.name)}
+                            ${messageStatus}
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
+        if (msg.type === 'audio') {
+            const fileData = JSON.parse(msg.content);
+            return `
+                <div class="message ${isOwn ? 'own' : ''}">
+                    <div class="message-content">
+                        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem;">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 24px; height: 24px; flex-shrink: 0;">
+                                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                <line x1="12" x2="12" y1="19" y2="22"></line>
+                            </svg>
+                            <audio src="${fileData.data}" controls style="flex: 1; max-width: 300px;"></audio>
+                        </div>
+                        <p style="font-size: 0.75rem; margin-top: 0.25rem; opacity: 0.8;">
+                            ${fileData.name || 'Voice Message'}
+                            ${messageStatus}
+                        </p>
                     </div>
                 </div>
             `;
@@ -642,7 +771,10 @@ function renderMessages() {
                             </svg>
                             <div class="file-info">
                                 <p class="file-name">${escapeHtml(fileData.name)}</p>
-                                <p class="file-size">${(fileData.size / 1024).toFixed(2)} KB</p>
+                                <p class="file-size">
+                                    ${(fileData.size / 1024).toFixed(2)} KB
+                                    ${messageStatus}
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -652,12 +784,14 @@ function renderMessages() {
 
         return `
             <div class="message ${isOwn ? 'own' : ''}">
-                <div class="message-content">${escapeHtml(msg.content)}</div>
+                <div class="message-content">
+                    ${escapeHtml(msg.content)}
+                    ${messageStatus}
+                </div>
             </div>
         `;
     }).join('');
 
-    // Add click event listeners to all images after rendering
     const messageImages = messagesArea.querySelectorAll('.message-image');
     messageImages.forEach(img => {
         img.addEventListener('click', function() {
@@ -666,6 +800,33 @@ function renderMessages() {
             openImageModal(imageSrc, imageName);
         });
     });
+}
+
+function getMessageStatus(msg, isOwn) {
+    if (!isOwn) return '';
+    
+    const status = msg.status || 'sent';
+    
+    if (status === 'seen') {
+        return `
+            <span class="message-status seen tick-double">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            </span>
+        `;
+    } else {
+        return `
+            <span class="message-status sent tick-single">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            </span>
+        `;
+    }
 }
 
 function scrollToBottom() {
@@ -677,12 +838,34 @@ function scrollToBottom() {
 function sendMessage() {
     const content = messageInput.value.trim();
 
-    if (!content || !selectedFriend) return;
-
-    if (!socket || !socket.connected) {
-        alert('Not connected to server.');
+    if (!content) {
+        console.log('Cannot send empty message');
         return;
     }
+
+    if (!selectedFriend) {
+        alert('Please select a friend first');
+        return;
+    }
+
+    if (!socket) {
+        console.error('Socket is not initialized');
+        alert('Connection not established. Please refresh the page.');
+        return;
+    }
+
+    if (!socket.connected) {
+        alert('Not connected to server. Please wait for connection...');
+        return;
+    }
+
+    console.log('📤 Sending message:', {
+        from: currentUser.id,
+        to: selectedFriend.id,
+        content: content.substring(0, 50) + '...',
+        socketConnected: socket.connected,
+        socketId: socket.id
+    });
 
     const tempMessage = {
         id: 'temp_' + Date.now() + Math.random().toString(36).substr(2, 9),
@@ -690,7 +873,8 @@ function sendMessage() {
         receiverId: selectedFriend.id,
         content: content,
         type: 'text',
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        status: 'sent'
     };
 
     messages.push(tempMessage);
@@ -700,11 +884,17 @@ function sendMessage() {
     messageInput.value = '';
     emojiPicker.style.display = 'none';
 
-    socket.emit('send_message', {
+    const messageData = {
         senderId: currentUser.id,
         receiverId: selectedFriend.id,
         content: content,
         type: 'text'
+    };
+
+    console.log('📨 Emitting send_message event:', messageData);
+
+    socket.emit('send_message', messageData, (response) => {
+        console.log('📬 Send message callback:', response);
     });
 
     if (typingTimeout) clearTimeout(typingTimeout);
@@ -770,7 +960,8 @@ async function handleFileUpload(e) {
             receiverId: selectedFriend.id,
             content: JSON.stringify(fileData),
             type: messageType,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            status: 'sent'
         };
 
         messages.push(tempMessage);
@@ -790,6 +981,8 @@ async function handleFileUpload(e) {
             receiverId: selectedFriend.id,
             content: JSON.stringify(fileData),
             type: messageType
+        }, (response) => {
+            console.log('📬 File send callback:', response);
         });
 
         console.log('✅ send_message event emitted successfully');
@@ -878,43 +1071,35 @@ function setupMobileMenu() {
 // SETTINGS MODAL FUNCTIONALITY
 // ==========================================
 function setupSettingsModal() {
-    // Open Settings Modal
     const settingsBtn = document.getElementById('settingsBtn');
     if (settingsBtn) {
         settingsBtn.addEventListener('click', openSettingsModal);
     }
 
-    // Close Settings Modal
     closeSettingsBtn.addEventListener('click', closeSettingsModal);
     settingsOverlay.addEventListener('click', closeSettingsModal);
 
-    // Open Edit Profile Modal from Settings
     editProfileBtn.addEventListener('click', () => {
         closeSettingsModal();
         openEditProfileModal();
     });
 
-    // Close Edit Profile Modal
     closeEditProfileBtn.addEventListener('click', closeEditProfileModal);
     editProfileOverlay.addEventListener('click', closeEditProfileModal);
 
-    // Back to Settings from Edit Profile
     backToSettingsBtn.addEventListener('click', () => {
         closeEditProfileModal();
         openSettingsModal();
     });
 
-    // Profile Photo Upload
     uploadPhotoBtn.addEventListener('click', () => {
         profilePhotoInput.click();
     });
 
     profilePhotoInput.addEventListener('change', handleProfilePhotoUpload);
 
-    // Save Profile
     saveProfileBtn.addEventListener('click', saveProfile);
 
-    // Close modals on Escape key
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             const imageModal = document.getElementById('imageModal');
@@ -924,6 +1109,8 @@ function setupSettingsModal() {
                 closeEditProfileModal();
             } else if (settingsModal.style.display === 'flex') {
                 closeSettingsModal();
+            } else if (karaokeModal.style.display === 'flex') {
+                closeKaraokeModal();
             }
         }
     });
@@ -953,10 +1140,8 @@ function closeEditProfileModal() {
 function loadUserProfile() {
     if (!currentUser) return;
 
-    // Load username
     usernameInput.value = currentUser.username || '';
 
-    // Load profile photo from server data
     if (currentUser.profilePhoto) {
         profilePhotoImg.src = currentUser.profilePhoto;
         profilePhotoImg.style.display = 'block';
@@ -972,14 +1157,12 @@ function handleProfilePhotoUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
         alert('Please select an image file');
         profilePhotoInput.value = '';
         return;
     }
 
-    // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
         alert('Image size must be less than 2MB');
         profilePhotoInput.value = '';
@@ -990,12 +1173,10 @@ function handleProfilePhotoUpload(e) {
     reader.onload = (event) => {
         const imageData = event.target.result;
         
-        // Display preview
         profilePhotoImg.src = imageData;
         profilePhotoImg.style.display = 'block';
         profilePhotoInitial.style.display = 'none';
         
-        // Store temporarily (will be saved when user clicks Save)
         profilePhotoInput.setAttribute('data-temp-photo', imageData);
     };
 
@@ -1010,7 +1191,6 @@ function handleProfilePhotoUpload(e) {
 async function saveProfile() {
     const newUsername = usernameInput.value.trim();
 
-    // Validate username
     if (!newUsername) {
         alert('Please enter a username');
         return;
@@ -1027,7 +1207,6 @@ async function saveProfile() {
     }
 
     try {
-        // Show loading state
         saveProfileBtn.disabled = true;
         saveProfileBtn.innerHTML = `
             <svg class="icon animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1036,11 +1215,9 @@ async function saveProfile() {
             <span>Saving...</span>
         `;
 
-        // Get profile photo data if changed
         const tempPhoto = profilePhotoInput.getAttribute('data-temp-photo');
         const profilePhoto = tempPhoto || currentUser.profilePhoto || null;
 
-        // Update profile on server
         const response = await fetch(`${API_URL}/user/update`, {
             method: 'POST',
             headers: {
@@ -1056,29 +1233,22 @@ async function saveProfile() {
         const data = await response.json();
 
         if (data.success) {
-            // Update local user object
             currentUser.username = newUsername;
             currentUser.profilePhoto = profilePhoto;
             localStorage.setItem('chatty_mirror_user', JSON.stringify(currentUser));
 
-            // Clear temp photo attribute
             if (tempPhoto) {
                 profilePhotoInput.removeAttribute('data-temp-photo');
             }
 
-            // Update UI
             loadUserProfile();
             
-            // Show success message
             alert('Profile updated successfully!');
             
-            // Close modal
             closeEditProfileModal();
 
-            // Reload friends list to update display
             await loadFriends();
             
-            // If in a chat, refresh the chat view
             if (selectedFriend) {
                 renderFriends();
             }
@@ -1089,7 +1259,6 @@ async function saveProfile() {
         console.error('Error updating profile:', error);
         alert('Failed to update profile. Please try again.');
     } finally {
-        // Reset button state
         saveProfileBtn.disabled = false;
         saveProfileBtn.innerHTML = `
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1115,13 +1284,11 @@ function setupImageModal() {
 
     console.log('✅ Image modal found and setting up...');
 
-    // Close modal when clicking X
     closeBtn.addEventListener('click', () => {
         modal.classList.remove('active');
         console.log('Modal closed via X button');
     });
 
-    // Close modal when clicking outside image
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
             modal.classList.remove('active');
@@ -1132,7 +1299,6 @@ function setupImageModal() {
     console.log('✅ Image modal setup complete');
 }
 
-// Function to open image in full screen
 function openImageModal(imageSrc, imageName = '') {
     console.log('🖼️ Opening image modal:', { 
         imageSrc: imageSrc.substring(0, 50) + '...', 
@@ -1155,7 +1321,668 @@ function openImageModal(imageSrc, imageName = '') {
     }
 }
 
+// ==========================================
+// KARAOKE MODAL FUNCTIONALITY - FIXED VERSION
+// ==========================================
+function setupKaraokeModal() {
+    if (!karaokeBtn) {
+        console.error('❌ Karaoke button not found');
+        return;
+    }
+
+    karaokeBtn.addEventListener('click', openKaraokeModal);
+    closeKaraokeBtn.addEventListener('click', closeKaraokeModal);
+    karaokeOverlay.addEventListener('click', closeKaraokeModal);
+
+    youtubeSearchBtn.addEventListener('click', searchYouTube);
+    youtubeSearchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') searchYouTube();
+    });
+
+    startRecordBtn.addEventListener('click', startCountdown);
+    stopRecordBtn.addEventListener('click', stopRecording);
+    sendRecordingBtn.addEventListener('click', sendKaraokeRecording);
+
+    console.log('✅ Karaoke modal setup complete');
+}
+
+function openKaraokeModal() {
+    if (!selectedFriend) {
+        alert('Please select a friend first to send karaoke recordings');
+        return;
+    }
+
+    karaokeModal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    console.log('🎤 Karaoke modal opened');
+}
+
+function closeKaraokeModal() {
+    console.log('🚪 Closing karaoke modal...');
+    
+    karaokeModal.style.display = 'none';
+    document.body.style.overflow = '';
+    
+    // 1. Stop recording if active
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        console.log('⏹️ Stopping active recording...');
+        mediaRecorder.stop();
+    }
+    mediaRecorder = null;
+    
+    // 2. Stop YouTube player (the visible one)
+    if (youtubePlayer) {
+        try {
+            console.log('⏹️ Stopping YouTube player...');
+            youtubePlayer.stopVideo();
+            youtubePlayer.destroy();
+        } catch (e) {
+            console.warn('Error stopping player:', e);
+        }
+        youtubePlayer = null;
+    }
+    
+    // 3. Remove hidden YouTube iframe (used during recording)
+    if (window.karaokeIframe) {
+        console.log('🗑️ Removing hidden YouTube iframe...');
+        window.karaokeIframe.remove();
+        window.karaokeIframe = null;
+    }
+    
+    // 4. Stop timer
+    if (recordingInterval) {
+        clearInterval(recordingInterval);
+        recordingInterval = null;
+    }
+    
+    // 5. Clean up all audio streams
+    cleanupStreams();
+    
+    // 6. Reset UI
+    resetKaraokeUI();
+    
+    console.log('✅ Karaoke modal fully closed and cleaned up');
+}
+
+function resetKaraokeUI() {
+    youtubeResults.style.display = 'none';
+    youtubeResults.innerHTML = '';
+    karaokePlayerSection.style.display = 'none';
+    recordedAudioPreview.style.display = 'none';
+    recordingIndicator.style.display = 'none';
+    startRecordBtn.style.display = 'inline-flex';
+    stopRecordBtn.style.display = 'none';
+    youtubeSearchInput.value = '';
+    recordingTimer.textContent = '00:00';
+    selectedVideoId = null;
+    recordedBlob = null;
+    audioChunks = [];
+    
+    // Clear the YouTube player div
+    const playerDiv = document.getElementById('youtubePlayer');
+    if (playerDiv) {
+        playerDiv.innerHTML = '';
+    }
+    
+    console.log('✅ UI reset complete');
+}
+
+// YouTube Search Function
+async function searchYouTube() {
+    const query = youtubeSearchInput.value.trim();
+    
+    if (!query) {
+        alert('Please enter a search term');
+        return;
+    }
+
+    youtubeSearchBtn.disabled = true;
+    youtubeSearchBtn.innerHTML = `
+        <svg class="icon animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+        </svg>
+        <span>Searching...</span>
+    `;
+
+    try {
+        const response = await fetch(`${API_URL}/youtube/search?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+
+        if (data.success && data.results && data.results.length > 0) {
+            displayYouTubeResults(data.results);
+            console.log('✅ Search results loaded from:', data.source);
+        } else {
+            alert('No results found. Please try a different search term.');
+            youtubeResults.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error searching YouTube:', error);
+        alert('Failed to search YouTube. Please check your internet connection and try again.');
+        youtubeResults.style.display = 'none';
+    } finally {
+        youtubeSearchBtn.disabled = false;
+        youtubeSearchBtn.innerHTML = `
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;">
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+            </svg>
+            <span>Search YouTube</span>
+        `;
+    }
+}
+
+function displayYouTubeResults(items) {
+    youtubeResults.style.display = 'block';
+    youtubeResults.innerHTML = items.map(item => {
+        const videoId = item.videoId;
+        const title = item.title;
+        const author = item.author;
+        const thumbnail = item.videoThumbnails && item.videoThumbnails.length > 0 
+            ? item.videoThumbnails.find(t => t.quality === 'medium')?.url || item.videoThumbnails[0].url
+            : `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+        
+        return `
+            <div class="youtube-video-item" data-video-id="${videoId}" onclick="selectYouTubeVideo('${videoId}', '${escapeHtml(title)}')">
+                <img src="${thumbnail}" alt="${escapeHtml(title)}" class="youtube-thumbnail" onerror="this.src='https://i.ytimg.com/vi/${videoId}/mqdefault.jpg'">
+                <div class="youtube-video-info">
+                    <div class="youtube-video-title">${escapeHtml(title)}</div>
+                    <div class="youtube-video-channel">${escapeHtml(author)}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function selectYouTubeVideo(videoId, title) {
+    selectedVideoId = videoId;
+    console.log('🎵 Selected video:', videoId, title);
+    
+    document.querySelectorAll('.youtube-video-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+    event.currentTarget.classList.add('selected');
+    
+    loadYouTubePlayer(videoId);
+}
+
+function loadYouTubePlayer(videoId) {
+    karaokePlayerSection.style.display = 'block';
+    recordedAudioPreview.style.display = 'none';
+    
+    if (youtubePlayer) {
+        youtubePlayer.loadVideoById(videoId);
+    } else {
+        if (!youtubeAPIReady) {
+            alert('YouTube player is loading. Please wait a moment and try again.');
+            return;
+        }
+        
+        youtubePlayer = new YT.Player('youtubePlayer', {
+            height: '400',
+            width: '100%',
+            videoId: videoId,
+            playerVars: {
+                'autoplay': 0,
+                'controls': 1,
+                'modestbranding': 1,
+                'rel': 0
+            },
+            events: {
+                'onReady': onPlayerReady,
+                'onError': onPlayerError
+            }
+        });
+    }
+    
+    console.log('✅ YouTube player loaded');
+}
+
+function onPlayerReady(event) {
+    console.log('✅ YouTube player ready');
+}
+
+function onPlayerError(event) {
+    console.error('❌ YouTube player error:', event.data);
+    alert('Error loading video. Please try another one.');
+}
+
+function startCountdown() {
+    if (!selectedVideoId) {
+        alert('Please select a karaoke song first');
+        return;
+    }
+
+    countdownOverlay.style.display = 'flex';
+    let count = 3;
+    countdownNumber.textContent = count;
+
+    const countdownInterval = setInterval(() => {
+        count--;
+        if (count > 0) {
+            countdownNumber.textContent = count;
+            countdownNumber.style.animation = 'none';
+            setTimeout(() => {
+                countdownNumber.style.animation = 'countdown 1s ease-in-out';
+            }, 10);
+        } else {
+            clearInterval(countdownInterval);
+            countdownOverlay.style.display = 'none';
+            startRecording();
+        }
+    }, 1000);
+}
+
+async function startRecording() {
+    try {
+        console.log('🎤 Starting ADVANCED karaoke recording...');
+        console.log('🎵 This will attempt to capture BOTH your mic AND YouTube audio');
+
+        // Step 1: Get microphone (headset/any mic)
+        console.log('🎙️ Step 1: Requesting microphone...');
+        micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: false, // Important: Don't cancel any audio
+                noiseSuppression: false,  // Don't suppress background sounds
+                autoGainControl: true,
+                sampleRate: 48000,
+                channelCount: 2
+            }
+        });
+        console.log('✅ Microphone captured');
+
+        // Step 2: Get desktop/tab audio (YouTube)
+        console.log('🖥️ Step 2: Requesting desktop/tab audio...');
+        console.log('⚠️ IMPORTANT: When browser asks:');
+        console.log('   1. Select "Chrome Tab" (NOT entire screen)');
+        console.log('   2. Choose THIS tab (where YouTube is playing)');
+        console.log('   3. CHECK the "Share tab audio" checkbox ✅');
+        
+        try {
+            desktopStream = await navigator.mediaDevices.getDisplayMedia({
+                video: true, // Must request video to get audio
+                audio: {
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false,
+                    sampleRate: 48000,
+                    channelCount: 2
+                },
+                preferCurrentTab: true,
+                selfBrowserSurface: "include",
+                surfaceSwitching: "include",
+                systemAudio: "include"
+            });
+
+            // Check if audio track exists
+            const audioTracks = desktopStream.getAudioTracks();
+            if (audioTracks.length === 0) {
+                throw new Error('NO_AUDIO_SELECTED');
+            }
+
+            console.log('✅ Desktop/Tab audio captured');
+            console.log('📊 Audio tracks:', audioTracks.length);
+
+            // Remove video track (we only need audio)
+            const videoTracks = desktopStream.getVideoTracks();
+            videoTracks.forEach(track => {
+                track.stop();
+                desktopStream.removeTrack(track);
+            });
+            console.log('🗑️ Video track removed (keeping only audio)');
+
+        } catch (displayError) {
+            console.error('❌ Desktop audio capture failed:', displayError);
+            
+            if (displayError.message === 'NO_AUDIO_SELECTED') {
+                alert('❌ No Audio Selected!\n\n' +
+                      'You must CHECK the "Share tab audio" checkbox when sharing.\n\n' +
+                      '📝 Steps:\n' +
+                      '1. Click "Chrome Tab"\n' +
+                      '2. Select THIS tab\n' +
+                      '3. ✅ CHECK "Share tab audio"\n' +
+                      '4. Click Share\n\n' +
+                      'Try again!');
+            } else if (displayError.name === 'NotAllowedError') {
+                alert('❌ Screen Share Cancelled\n\n' +
+                      'You need to share your tab to capture YouTube audio.\n\n' +
+                      'Without tab sharing, only your voice will be recorded.\n\n' +
+                      'Continue with voice-only recording?') && 
+                      await startVoiceOnlyRecording();
+                return;
+            } else {
+                alert('❌ Desktop audio not available.\n\n' +
+                      'Your browser might not support tab audio capture.\n\n' +
+                      'Try:\n' +
+                      '- Using Chrome/Edge (latest version)\n' +
+                      '- Or continue with voice-only recording');
+                
+                if (confirm('Continue with voice-only recording?')) {
+                    await startVoiceOnlyRecording();
+                }
+                return;
+            }
+            
+            cleanupStreams();
+            return;
+        }
+
+        // Step 3: Mix both audio sources using Web Audio API
+        console.log('🎛️ Step 3: Mixing audio sources...');
+        
+        audioContext = new AudioContext({ sampleRate: 48000 });
+        
+        // Create sources
+        const micSource = audioContext.createMediaStreamSource(micStream);
+        const desktopSource = audioContext.createMediaStreamSource(desktopStream);
+        
+        // Create gain nodes for volume control
+        const micGain = audioContext.createGain();
+        const musicGain = audioContext.createGain();
+        
+        micGain.gain.value = 1.5;  // Boost voice by 50%
+        musicGain.gain.value = 0.7; // Reduce music to 70%
+        
+        // Create destination (mixed output)
+        const destination = audioContext.createMediaStreamDestination();
+        
+        // Connect everything
+        micSource.connect(micGain);
+        micGain.connect(destination);
+        
+        desktopSource.connect(musicGain);
+        musicGain.connect(destination);
+        
+        console.log('✅ Audio mixed: Mic (150%) + Music (70%)');
+
+        // Step 4: Create MediaRecorder with mixed audio
+        mediaRecorder = new MediaRecorder(destination.stream, {
+            mimeType: 'audio/webm;codecs=opus',
+            audioBitsPerSecond: 192000 // Higher quality
+        });
+
+        audioChunks = [];
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) audioChunks.push(e.data);
+        };
+        mediaRecorder.onstop = handleRecordingStop;
+
+        // Start recording
+        mediaRecorder.start(100);
+        recordingStartTime = Date.now();
+
+        // Start YouTube video
+        if (youtubePlayer) {
+            youtubePlayer.playVideo();
+            console.log('▶️ YouTube player started');
+        }
+
+        // Update UI
+        startRecordBtn.style.display = 'none';
+        stopRecordBtn.style.display = 'inline-flex';
+        recordingIndicator.style.display = 'flex';
+        recordingIndicator.innerHTML = `
+            <span class="recording-pulse"></span>
+            <span>Recording (MIC + MUSIC)</span>
+        `;
+        recordingInterval = setInterval(updateRecordingTimer, 1000);
+
+        console.log('✅ 🎉 FULL KARAOKE RECORDING STARTED!');
+        console.log('🎤 Capturing: Microphone + YouTube Audio');
+        console.log('🎵 Quality: High (192kbps)');
+        console.log('📊 Mix: Voice 150% | Music 70%');
+
+    } catch (error) {
+        console.error('❌ Recording error:', error);
+        
+        if (error.name === 'NotAllowedError') {
+            alert('❌ Permission Denied\n\n' +
+                  'Microphone access is required.\n\n' +
+                  'Please allow access and try again.');
+        } else if (error.name === 'NotFoundError') {
+            alert('❌ No Microphone Found\n\n' +
+                  'Please connect a microphone or headset.');
+        } else {
+            alert('❌ Recording Failed\n\n' + error.message);
+        }
+        
+        cleanupStreams();
+    }
+}
+
+// Fallback: Voice-only recording
+async function startVoiceOnlyRecording() {
+    try {
+        console.log('🎤 Starting voice-only recording...');
+
+        mediaRecorder = new MediaRecorder(micStream, {
+            mimeType: 'audio/webm;codecs=opus',
+            audioBitsPerSecond: 128000
+        });
+
+        audioChunks = [];
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) audioChunks.push(e.data);
+        };
+        mediaRecorder.onstop = handleRecordingStop;
+
+        mediaRecorder.start(100);
+        recordingStartTime = Date.now();
+
+        if (youtubePlayer) {
+            youtubePlayer.playVideo();
+        }
+
+        startRecordBtn.style.display = 'none';
+        stopRecordBtn.style.display = 'inline-flex';
+        recordingIndicator.style.display = 'flex';
+        recordingIndicator.innerHTML = `
+            <span class="recording-pulse"></span>
+            <span>Recording (VOICE ONLY)</span>
+        `;
+        recordingInterval = setInterval(updateRecordingTimer, 1000);
+
+        console.log('✅ Voice-only recording started');
+
+    } catch (error) {
+        console.error('❌ Voice recording error:', error);
+        alert('Failed to start recording: ' + error.message);
+        cleanupStreams();
+    }
+}
+
+function updateRecordingTimer() {
+    if (!recordingStartTime) return;
+    
+    const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = elapsed % 60;
+    recordingTimer.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function stopRecording() {
+    if (!mediaRecorder || mediaRecorder.state !== 'recording') {
+        console.warn('⚠️ No active recording to stop');
+        return;
+    }
+
+    console.log('⏹️ Stopping recording...');
+    
+    mediaRecorder.stop();
+    
+    // Stop YouTube player
+    if (youtubePlayer && youtubePlayer.pauseVideo) {
+        youtubePlayer.pauseVideo();
+    }
+    
+    // Stop timer
+    if (recordingInterval) {
+        clearInterval(recordingInterval);
+        recordingInterval = null;
+    }
+    
+    // Update UI
+    startRecordBtn.style.display = 'inline-flex';
+    stopRecordBtn.style.display = 'none';
+    recordingIndicator.style.display = 'none';
+    
+    console.log('✅ Recording stopped');
+}
+
+function handleRecordingStop() {
+    console.log('🎬 Processing karaoke recording...');
+    
+    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+    recordedBlob = audioBlob;
+    
+    // Create preview URL
+    const audioUrl = URL.createObjectURL(audioBlob);
+    recordedAudio.src = audioUrl;
+    
+    // Show preview
+    recordedAudioPreview.style.display = 'block';
+    
+    console.log('✅ Karaoke recording ready!');
+    console.log('📊 Size:', (audioBlob.size / 1024).toFixed(2), 'KB');
+    
+    cleanupStreams();
+}
+
+// Cleanup all streams and resources - ENHANCED VERSION
+function cleanupStreams() {
+    console.log('🧹 Cleaning up all streams and resources...');
+    
+    // 1. Remove ANY YouTube iframes (both visible and hidden)
+    const allIframes = document.querySelectorAll('iframe[src*="youtube.com"]');
+    allIframes.forEach(iframe => {
+        console.log('🗑️ Removing iframe:', iframe.id || 'unnamed');
+        iframe.remove();
+    });
+    
+    if (window.karaokeIframe) {
+        try {
+            window.karaokeIframe.remove();
+        } catch (e) {
+            console.warn('Iframe already removed');
+        }
+        window.karaokeIframe = null;
+    }
+    
+    // 2. Stop microphone stream
+    if (micStream) {
+        micStream.getTracks().forEach(track => {
+            track.stop();
+            console.log('🛑 Stopped mic track:', track.label);
+        });
+        micStream = null;
+    }
+    
+    // 3. Stop desktop audio stream
+    if (desktopStream) {
+        desktopStream.getTracks().forEach(track => {
+            track.stop();
+            console.log('🛑 Stopped desktop track:', track.label);
+        });
+        desktopStream = null;
+    }
+    
+    // 4. Close audio context
+    if (audioContext) {
+        if (audioContext.state !== 'closed') {
+            audioContext.close().then(() => {
+                console.log('🔇 Audio context closed');
+            }).catch(e => {
+                console.warn('Error closing audio context:', e);
+            });
+        }
+        audioContext = null;
+    }
+    
+    // 5. Clear destination
+    mediaStreamDestination = null;
+    
+    // 6. Reset recording state
+    recordingStartTime = null;
+    audioChunks = [];
+    
+    console.log('✅ All streams and resources cleaned up');
+}
+
+async function sendKaraokeRecording() {
+    if (!recordedBlob) {
+        alert('No recording to send');
+        return;
+    }
+
+    if (!selectedFriend) {
+        alert('Please select a friend first');
+        return;
+    }
+
+    if (!socket || !socket.connected) {
+        alert('Not connected to server');
+        return;
+    }
+
+    try {
+        sendRecordingBtn.disabled = true;
+        sendRecordingBtn.innerHTML = `
+            <svg class="icon animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+            </svg>
+            <span>Sending...</span>
+        `;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            const audioData = {
+                name: `Karaoke Recording - ${new Date().toLocaleString()}`,
+                type: recordedBlob.type,
+                size: recordedBlob.size,
+                data: event.target.result
+            };
+
+            console.log('🎤 Sending karaoke:', audioData.size, 'bytes');
+
+            const tempMessage = {
+                id: 'temp_' + Date.now() + Math.random().toString(36).substr(2, 9),
+                senderId: currentUser.id,
+                receiverId: selectedFriend.id,
+                content: JSON.stringify(audioData),
+                type: 'audio',
+                timestamp: Date.now(),
+                status: 'sent'
+            };
+
+            messages.push(tempMessage);
+            renderMessages();
+            scrollToBottom();
+
+            socket.emit('send_message', {
+                senderId: currentUser.id,
+                receiverId: selectedFriend.id,
+                content: JSON.stringify(audioData),
+                type: 'audio'
+            });
+
+            closeKaraokeModal();
+            alert('Karaoke recording sent! 🎤');
+        };
+
+        reader.onerror = () => {
+            alert('Failed to process recording');
+            sendRecordingBtn.disabled = false;
+            sendRecordingBtn.innerHTML = `<span>Send to Chat</span>`;
+        };
+
+        reader.readAsDataURL(recordedBlob);
+    } catch (error) {
+        console.error('Error sending:', error);
+        alert('Failed to send. Please try again.');
+        sendRecordingBtn.disabled = false;
+    }
+}
+
 // Make functions globally accessible
 window.addFriend = addFriend;
 window.insertEmoji = insertEmoji;
 window.openImageModal = openImageModal;
+window.selectYouTubeVideo = selectYouTubeVideo;
