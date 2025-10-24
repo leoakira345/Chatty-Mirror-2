@@ -498,6 +498,113 @@ body {
     margin-top: 0.25rem;
 }
 
+/* Message Status Ticks Styles - Add this section anywhere in your style.css */
+
+/* Message Status Container */
+.message-status {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+    vertical-align: middle;
+    gap: 2px;
+}
+
+.message-status svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2.5;
+}
+
+/* Single tick - gray (offline/sent) */
+.message-status.sent {
+    color: #9ca3af;
+}
+
+.message-status.sent svg {
+    stroke: #9ca3af;
+}
+
+/* Double tick - green (seen/read) */
+.message-status.seen {
+    color: #10b981;
+}
+
+.message-status.seen svg {
+    stroke: #10b981;
+}
+
+/* Double Tick - Two overlapping ticks */
+.tick-double {
+    position: relative;
+    display: inline-flex;
+}
+
+.tick-double svg:first-child {
+    position: relative;
+    margin-right: -8px;
+    z-index: 1;
+}
+
+.tick-double svg:last-child {
+    position: relative;
+    z-index: 2;
+}
+
+/* Single Tick */
+.tick-single {
+    display: inline-flex;
+}
+
+/* Message timestamp and status wrapper */
+.message-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 0.75rem;
+    opacity: 0.8;
+}
+
+.message.own .message-footer {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.message:not(.own) .message-footer {
+    color: #6b7280;
+}
+
+.message-time {
+    font-size: 0.75rem;
+}
+
+/* Responsive adjustments for ticks */
+@media (max-width: 639px) {
+    .message-status svg {
+        width: 14px;
+        height: 14px;
+    }
+    
+    .message-footer {
+        font-size: 0.6875rem;
+    }
+    
+    .tick-double svg:first-child {
+        margin-right: -7px;
+    }
+}
+
+@media (max-width: 374px) {
+    .message-status svg {
+        width: 12px;
+        height: 12px;
+    }
+    
+    .tick-double svg:first-child {
+        margin-right: -6px;
+    }
+}
+
 /* Input Area */
 .input-area {
     background: white;
