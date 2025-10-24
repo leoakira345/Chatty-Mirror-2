@@ -15,6 +15,268 @@
     
     <!-- Preconnect for faster loading -->
     <link rel="preconnect" href="https://cdn.socket.io">
+    
+    <style>
+        /* Custom Settings Icon Style */
+        .settings-icon-img {
+            width: 24px;
+            height: 24px;
+            display: block;
+        }
+
+        /* Karaoke Modal Styles */
+        .karaoke-modal {
+            max-width: 800px;
+            width: 90%;
+        }
+
+        .youtube-search-container {
+            margin-bottom: 1.5rem;
+        }
+
+        .youtube-search-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .youtube-search-btn {
+            width: 100%;
+            padding: 0.75rem;
+            background: #ff0000;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .youtube-search-btn:hover {
+            background: #cc0000;
+        }
+
+        .youtube-results {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 1.5rem;
+        }
+
+        .youtube-video-item {
+            display: flex;
+            gap: 1rem;
+            padding: 0.75rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .youtube-video-item:hover {
+            background: #f3f4f6;
+            border-color: #2563eb;
+        }
+
+        .youtube-video-item.selected {
+            background: #eff6ff;
+            border-color: #2563eb;
+        }
+
+        .youtube-thumbnail {
+            width: 120px;
+            height: 90px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .youtube-video-info {
+            flex: 1;
+        }
+
+        .youtube-video-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: #1f2937;
+        }
+
+        .youtube-video-channel {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        .karaoke-player-section {
+            background: #f9fafb;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .video-player {
+            width: 100%;
+            height: 400px;
+            background: #000;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .karaoke-controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .record-btn {
+            padding: 1rem 2rem;
+            background: #dc2626;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.1rem;
+            transition: all 0.3s;
+        }
+
+        .record-btn:hover {
+            background: #b91c1c;
+            transform: scale(1.05);
+        }
+
+        .record-btn.recording {
+            background: #ef4444;
+            animation: pulse 1.5s infinite;
+        }
+
+        .stop-btn {
+            padding: 1rem 2rem;
+            background: #374151;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .stop-btn:hover {
+            background: #1f2937;
+        }
+
+        .countdown-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .countdown-number {
+            font-size: 10rem;
+            color: white;
+            font-weight: bold;
+            animation: countdown 1s ease-in-out;
+        }
+
+        @keyframes countdown {
+            0% {
+                transform: scale(0.5);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.2);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .recording-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #dc2626;
+            font-weight: 600;
+        }
+
+        .recording-dot {
+            width: 12px;
+            height: 12px;
+            background: #dc2626;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        .recording-timer {
+            font-size: 1.2rem;
+            font-family: monospace;
+        }
+
+        .recorded-audio-preview {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .send-recording-btn {
+            width: 100%;
+            padding: 1rem;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 1rem;
+            margin-top: 1rem;
+        }
+
+        .send-recording-btn:hover {
+            background: #1d4ed8;
+        }
+
+        .karaoke-btn {
+            background: linear-gradient(135deg, #667eea 0%, #ffffff 100%);
+        }
+
+        .karaoke-btn:hover {
+            background: linear-gradient(135deg, #5a67d8 0%, #ffffff 100%);
+        }
+    </style>
 </head>
 <body>
     <!-- Header -->
@@ -35,10 +297,7 @@
                     </svg>
                 </div>
                 <button class="icon-btn settings-btn" id="settingsBtn" title="Settings" aria-label="Settings">
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"></circle>
-                        <path d="M12 1v6m0 6v6m5.2-13.2l-1.4 1.4m-7.6 7.6L6.8 16.2M23 12h-6m-6 0H1m16.2 5.2l-1.4-1.4m-7.6-7.6L6.8 7.8"></path>
-                    </svg>
+                    <img src="https://i.ibb.co/nNFK7333/2699-color-170x170-removebg-preview.png" alt="Settings" class="settings-icon-img">
                 </button>
             </div>
         </div>
@@ -164,6 +423,14 @@
                             style="display: none;" 
                             accept="image/*,video/*,.pdf,.doc,.docx,.txt,.zip"
                             aria-hidden="true">
+
+                        <button class="icon-btn karaoke-btn" id="karaokeBtn" title="Karaoke" aria-label="Karaoke">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                <line x1="12" x2="12" y1="19" y2="22"></line>
+                            </svg>
+                        </button>
                         
                         <button class="icon-btn" id="emojiBtn" title="Add emoji" aria-label="Add emoji">
                             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -299,6 +566,87 @@
         </div>
     </div>
 
+    <!-- Karaoke Modal -->
+    <div id="karaokeModal" class="modal" style="display: none;">
+        <div class="modal-overlay" id="karaokeOverlay"></div>
+        <div class="modal-content karaoke-modal">
+            <div class="modal-header">
+                <h2>🎤 Karaoke Studio</h2>
+                <button class="close-btn" id="closeKaraokeBtn" aria-label="Close karaoke">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- YouTube Search Section -->
+                <div class="youtube-search-container">
+                    <input 
+                        type="text" 
+                        id="youtubeSearchInput" 
+                        class="youtube-search-input" 
+                        placeholder="Search for karaoke songs on YouTube..."
+                        autocomplete="off">
+                    <button class="youtube-search-btn" id="youtubeSearchBtn">
+                        <svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;">
+                            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                        </svg>
+                        <span>Search YouTube</span>
+                    </button>
+                </div>
+
+                <!-- YouTube Results -->
+                <div id="youtubeResults" class="youtube-results" style="display: none;"></div>
+
+                <!-- Karaoke Player Section -->
+                <div id="karaokePlayerSection" class="karaoke-player-section" style="display: none;">
+                    <div id="youtubePlayer" class="video-player"></div>
+                    
+                    <div class="karaoke-controls">
+                        <button class="record-btn" id="startRecordBtn">
+                            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px;">
+                                <circle cx="12" cy="12" r="10"/>
+                            </svg>
+                            <span>Start Recording</span>
+                        </button>
+                        
+                        <button class="stop-btn" id="stopRecordBtn" style="display: none;">
+                            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px;">
+                                <rect x="6" y="6" width="12" height="12"/>
+                            </svg>
+                            <span>Stop Recording</span>
+                        </button>
+                    </div>
+
+                    <div id="recordingIndicator" class="recording-indicator" style="display: none; justify-content: center; margin-top: 1rem;">
+                        <div class="recording-dot"></div>
+                        <span>Recording</span>
+                        <span class="recording-timer" id="recordingTimer">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Recorded Audio Preview -->
+                <div id="recordedAudioPreview" class="recorded-audio-preview" style="display: none;">
+                    <h3 style="margin-bottom: 1rem;">Your Recording</h3>
+                    <audio id="recordedAudio" controls style="width: 100%; margin-bottom: 1rem;"></audio>
+                    <button class="send-recording-btn" id="sendRecordingBtn">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                        <span>Send to Chat</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Countdown Overlay -->
+    <div id="countdownOverlay" class="countdown-overlay" style="display: none;">
+        <div class="countdown-number" id="countdownNumber">3</div>
+    </div>
+
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="loading-overlay">
         <div class="spinner"></div>
@@ -317,8 +665,49 @@
                 opacity: 1;
             }
         }
+
+        /* Message Status Ticks Styles */
+        .message-status {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
+        .message-status svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Single tick - gray (offline/sent) */
+        .message-status.sent svg {
+            color: #9ca3af;
+        }
+
+        /* Double tick - green (seen) */
+        .message-status.seen svg {
+            color: #10b981;
+        }
+
+        /* Single Tick SVG */
+        .tick-single {
+            position: relative;
+        }
+
+        /* Double Tick - Two overlapping ticks */
+        .tick-double {
+            position: relative;
+        }
+
+        .tick-double svg:first-child {
+            position: absolute;
+            left: -4px;
+        }
     </style>
 
+    <!-- YouTube IFrame API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+    
     <!-- Socket.IO (must be loaded before app.js) -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="app.js"></script>
