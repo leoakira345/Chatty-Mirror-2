@@ -226,6 +226,9 @@ function initializeSocket() {
         if (currentUser) {
             console.log('Emitting user_connected for:', currentUser.id);
             socket.emit('user_connected', currentUser.id);
+            
+            // 👉 ADD THIS LINE
+            setTimeout(() => checkServerStatus(), 1000);
         }
     });
 
@@ -350,6 +353,20 @@ function initializeSocket() {
     socket.on('error', (error) => {
         console.error('❌ Socket error:', error);
     });
+}
+
+// 👉 ADD THIS NEW FUNCTION HERE
+async function checkServerStatus() {
+    try {
+        const response = await fetch(`${API_URL}/health`);
+        const data = await response.json();
+        console.log('📊 Server Status:', {
+            active: data.activeUsers,
+            users: data.activeUsersList
+        });
+    } catch (error) {
+        console.error('Failed to check server status');
+    }
 }
 
 function markMessageAsSeen(messageId) {
@@ -1363,14 +1380,14 @@ function closeKaraokeModal() {
     karaokeModal.style.display = 'none';
     document.body.style.overflow = '';
     
-    // 1. Stop recording if active
+    // Stop recording if active
     if (mediaRecorder && mediaRecorder.state === 'recording') {
         console.log('⏹️ Stopping active recording...');
         mediaRecorder.stop();
     }
     mediaRecorder = null;
     
-    // 2. Stop YouTube player (the visible one)
+    // Stop YouTube player
     if (youtubePlayer) {
         try {
             console.log('⏹️ Stopping YouTube player...');
@@ -1382,43 +1399,54 @@ function closeKaraokeModal() {
         youtubePlayer = null;
     }
     
-    // 3. Remove hidden YouTube iframe (used during recording)
+    // Remove hidden iframe
     if (window.karaokeIframe) {
         console.log('🗑️ Removing hidden YouTube iframe...');
         window.karaokeIframe.remove();
         window.karaokeIframe = null;
     }
     
-    // 4. Stop timer
+    // Stop timer
     if (recordingInterval) {
         clearInterval(recordingInterval);
         recordingInterval = null;
     }
     
-    // 5. Clean up all audio streams
+    // Clean up streams
     cleanupStreams();
     
-    // 6. Reset UI
+    // Reset UI
     resetKaraokeUI();
     
-    console.log('✅ Karaoke modal fully closed and cleaned up');
+    console.log('✅ Karaoke modal fully closed');
 }
 
 function resetKaraokeUI() {
+    // Clear YouTube results
     youtubeResults.style.display = 'none';
     youtubeResults.innerHTML = '';
+    
+    // Hide player and preview sections
     karaokePlayerSection.style.display = 'none';
     recordedAudioPreview.style.display = 'none';
     recordingIndicator.style.display = 'none';
+    
+    // Reset buttons
     startRecordBtn.style.display = 'inline-flex';
     stopRecordBtn.style.display = 'none';
+    
+    // Clear search input
     youtubeSearchInput.value = '';
+    
+    // Reset timer
     recordingTimer.textContent = '00:00';
+    
+    // Reset state
     selectedVideoId = null;
     recordedBlob = null;
     audioChunks = [];
     
-    // Clear the YouTube player div
+    // Clear YouTube player div completely
     const playerDiv = document.getElementById('youtubePlayer');
     if (playerDiv) {
         playerDiv.innerHTML = '';
@@ -1427,7 +1455,6 @@ function resetKaraokeUI() {
     console.log('✅ UI reset complete');
 }
 
-// YouTube Search Function
 async function searchYouTube() {
     const query = youtubeSearchInput.value.trim();
     
@@ -1450,14 +1477,14 @@ async function searchYouTube() {
 
         if (data.success && data.results && data.results.length > 0) {
             displayYouTubeResults(data.results);
-            console.log('✅ Search results loaded from:', data.source);
+            console.log('✅ Search results loaded');
         } else {
             alert('No results found. Please try a different search term.');
             youtubeResults.style.display = 'none';
         }
     } catch (error) {
         console.error('Error searching YouTube:', error);
-        alert('Failed to search YouTube. Please check your internet connection and try again.');
+        alert('Failed to search YouTube. Please check your internet connection.');
         youtubeResults.style.display = 'none';
     } finally {
         youtubeSearchBtn.disabled = false;
@@ -1496,44 +1523,61 @@ function selectYouTubeVideo(videoId, title) {
     selectedVideoId = videoId;
     console.log('🎵 Selected video:', videoId, title);
     
+    // Remove previous selection
     document.querySelectorAll('.youtube-video-item').forEach(item => {
         item.classList.remove('selected');
     });
     event.currentTarget.classList.add('selected');
     
+    // Load player
     loadYouTubePlayer(videoId);
 }
 
 function loadYouTubePlayer(videoId) {
+    console.log('📺 Loading YouTube player for:', videoId);
+    
+    // Show player section
     karaokePlayerSection.style.display = 'block';
     recordedAudioPreview.style.display = 'none';
     
-    if (youtubePlayer) {
-        youtubePlayer.loadVideoById(videoId);
-    } else {
-        if (!youtubeAPIReady) {
-            alert('YouTube player is loading. Please wait a moment and try again.');
-            return;
-        }
-        
-        youtubePlayer = new YT.Player('youtubePlayer', {
-            height: '400',
-            width: '100%',
-            videoId: videoId,
-            playerVars: {
-                'autoplay': 0,
-                'controls': 1,
-                'modestbranding': 1,
-                'rel': 0
-            },
-            events: {
-                'onReady': onPlayerReady,
-                'onError': onPlayerError
-            }
-        });
+    // Clear any existing player
+    const playerDiv = document.getElementById('youtubePlayer');
+    if (playerDiv) {
+        playerDiv.innerHTML = '';
     }
     
-    console.log('✅ YouTube player loaded');
+    if (youtubePlayer) {
+        try {
+            youtubePlayer.destroy();
+        } catch (e) {
+            console.warn('Error destroying old player:', e);
+        }
+        youtubePlayer = null;
+    }
+    
+    // Create new player
+    if (!youtubeAPIReady) {
+        alert('YouTube player is loading. Please wait a moment and try again.');
+        return;
+    }
+    
+    youtubePlayer = new YT.Player('youtubePlayer', {
+        height: '400',
+        width: '100%',
+        videoId: videoId,
+        playerVars: {
+            'autoplay': 0,
+            'controls': 1,
+            'modestbranding': 1,
+            'rel': 0
+        },
+        events: {
+            'onReady': onPlayerReady,
+            'onError': onPlayerError
+        }
+    });
+    
+    console.log('✅ YouTube player created');
 }
 
 function onPlayerReady(event) {
@@ -1571,17 +1615,21 @@ function startCountdown() {
     }, 1000);
 }
 
+// MOBILE & DESKTOP COMPATIBLE RECORDING
 async function startRecording() {
     try {
-        console.log('🎤 Starting ADVANCED karaoke recording...');
-        console.log('🎵 This will attempt to capture BOTH your mic AND YouTube audio');
-
-        // Step 1: Get microphone (headset/any mic)
-        console.log('🎙️ Step 1: Requesting microphone...');
+        console.log('🎤 Starting karaoke recording...');
+        
+        // Detect if mobile
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        
+        // Step 1: Get microphone
+        console.log('🎙️ Requesting microphone...');
         micStream = await navigator.mediaDevices.getUserMedia({
             audio: {
-                echoCancellation: false, // Important: Don't cancel any audio
-                noiseSuppression: false,  // Don't suppress background sounds
+                echoCancellation: false,
+                noiseSuppression: false,
                 autoGainControl: true,
                 sampleRate: 48000,
                 channelCount: 2
@@ -1589,114 +1637,73 @@ async function startRecording() {
         });
         console.log('✅ Microphone captured');
 
-        // Step 2: Get desktop/tab audio (YouTube)
-        console.log('🖥️ Step 2: Requesting desktop/tab audio...');
-        console.log('⚠️ IMPORTANT: When browser asks:');
-        console.log('   1. Select "Chrome Tab" (NOT entire screen)');
-        console.log('   2. Choose THIS tab (where YouTube is playing)');
-        console.log('   3. CHECK the "Share tab audio" checkbox ✅');
+        // Step 2: Try desktop audio capture (only for desktop browsers)
+        let finalStream;
         
-        try {
-            desktopStream = await navigator.mediaDevices.getDisplayMedia({
-                video: true, // Must request video to get audio
-                audio: {
-                    echoCancellation: false,
-                    noiseSuppression: false,
-                    autoGainControl: false,
-                    sampleRate: 48000,
-                    channelCount: 2
-                },
-                preferCurrentTab: true,
-                selfBrowserSurface: "include",
-                surfaceSwitching: "include",
-                systemAudio: "include"
-            });
+        if (!isMobile && !isIOS) {
+            console.log('🖥️ Desktop detected - attempting tab audio capture...');
+            try {
+                desktopStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: true,
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false,
+                        sampleRate: 48000,
+                        channelCount: 2
+                    },
+                    preferCurrentTab: true
+                });
 
-            // Check if audio track exists
-            const audioTracks = desktopStream.getAudioTracks();
-            if (audioTracks.length === 0) {
-                throw new Error('NO_AUDIO_SELECTED');
-            }
-
-            console.log('✅ Desktop/Tab audio captured');
-            console.log('📊 Audio tracks:', audioTracks.length);
-
-            // Remove video track (we only need audio)
-            const videoTracks = desktopStream.getVideoTracks();
-            videoTracks.forEach(track => {
-                track.stop();
-                desktopStream.removeTrack(track);
-            });
-            console.log('🗑️ Video track removed (keeping only audio)');
-
-        } catch (displayError) {
-            console.error('❌ Desktop audio capture failed:', displayError);
-            
-            if (displayError.message === 'NO_AUDIO_SELECTED') {
-                alert('❌ No Audio Selected!\n\n' +
-                      'You must CHECK the "Share tab audio" checkbox when sharing.\n\n' +
-                      '📝 Steps:\n' +
-                      '1. Click "Chrome Tab"\n' +
-                      '2. Select THIS tab\n' +
-                      '3. ✅ CHECK "Share tab audio"\n' +
-                      '4. Click Share\n\n' +
-                      'Try again!');
-            } else if (displayError.name === 'NotAllowedError') {
-                alert('❌ Screen Share Cancelled\n\n' +
-                      'You need to share your tab to capture YouTube audio.\n\n' +
-                      'Without tab sharing, only your voice will be recorded.\n\n' +
-                      'Continue with voice-only recording?') && 
-                      await startVoiceOnlyRecording();
-                return;
-            } else {
-                alert('❌ Desktop audio not available.\n\n' +
-                      'Your browser might not support tab audio capture.\n\n' +
-                      'Try:\n' +
-                      '- Using Chrome/Edge (latest version)\n' +
-                      '- Or continue with voice-only recording');
-                
-                if (confirm('Continue with voice-only recording?')) {
-                    await startVoiceOnlyRecording();
+                const audioTracks = desktopStream.getAudioTracks();
+                if (audioTracks.length === 0) {
+                    throw new Error('NO_AUDIO_SELECTED');
                 }
-                return;
+
+                console.log('✅ Desktop audio captured');
+                
+                // Remove video tracks
+                desktopStream.getVideoTracks().forEach(track => {
+                    track.stop();
+                    desktopStream.removeTrack(track);
+                });
+
+                // Mix mic + desktop audio
+                audioContext = new AudioContext({ sampleRate: 48000 });
+                const micSource = audioContext.createMediaStreamSource(micStream);
+                const desktopSource = audioContext.createMediaStreamSource(desktopStream);
+                
+                const micGain = audioContext.createGain();
+                const musicGain = audioContext.createGain();
+                
+                micGain.gain.value = 1.5;
+                musicGain.gain.value = 0.7;
+                
+                const destination = audioContext.createMediaStreamDestination();
+                
+                micSource.connect(micGain);
+                micGain.connect(destination);
+                
+                desktopSource.connect(musicGain);
+                musicGain.connect(destination);
+                
+                finalStream = destination.stream;
+                console.log('✅ Mixed audio: Mic (150%) + Music (70%)');
+                
+            } catch (displayError) {
+                console.warn('⚠️ Desktop audio failed, using mic only:', displayError.message);
+                finalStream = micStream;
             }
-            
-            cleanupStreams();
-            return;
+        } else {
+            // Mobile: mic-only recording
+            console.log('📱 Mobile detected - using microphone only');
+            finalStream = micStream;
         }
 
-        // Step 3: Mix both audio sources using Web Audio API
-        console.log('🎛️ Step 3: Mixing audio sources...');
-        
-        audioContext = new AudioContext({ sampleRate: 48000 });
-        
-        // Create sources
-        const micSource = audioContext.createMediaStreamSource(micStream);
-        const desktopSource = audioContext.createMediaStreamSource(desktopStream);
-        
-        // Create gain nodes for volume control
-        const micGain = audioContext.createGain();
-        const musicGain = audioContext.createGain();
-        
-        micGain.gain.value = 1.5;  // Boost voice by 50%
-        musicGain.gain.value = 0.7; // Reduce music to 70%
-        
-        // Create destination (mixed output)
-        const destination = audioContext.createMediaStreamDestination();
-        
-        // Connect everything
-        micSource.connect(micGain);
-        micGain.connect(destination);
-        
-        desktopSource.connect(musicGain);
-        musicGain.connect(destination);
-        
-        console.log('✅ Audio mixed: Mic (150%) + Music (70%)');
-
-        // Step 4: Create MediaRecorder with mixed audio
-        mediaRecorder = new MediaRecorder(destination.stream, {
+        // Step 3: Create MediaRecorder
+        mediaRecorder = new MediaRecorder(finalStream, {
             mimeType: 'audio/webm;codecs=opus',
-            audioBitsPerSecond: 192000 // Higher quality
+            audioBitsPerSecond: 192000
         });
 
         audioChunks = [];
@@ -1709,82 +1716,48 @@ async function startRecording() {
         mediaRecorder.start(100);
         recordingStartTime = Date.now();
 
-        // Start YouTube video
+        // Start YouTube
         if (youtubePlayer) {
             youtubePlayer.playVideo();
-            console.log('▶️ YouTube player started');
         }
 
         // Update UI
         startRecordBtn.style.display = 'none';
         stopRecordBtn.style.display = 'inline-flex';
         recordingIndicator.style.display = 'flex';
-        recordingIndicator.innerHTML = `
-            <span class="recording-pulse"></span>
-            <span>Recording (MIC + MUSIC)</span>
-        `;
+        
+        if (isMobile) {
+            recordingIndicator.innerHTML = `
+                <span class="recording-pulse"></span>
+                <span>Recording (MIC ONLY)</span>
+            `;
+        } else if (desktopStream) {
+            recordingIndicator.innerHTML = `
+                <span class="recording-pulse"></span>
+                <span>Recording (MIC + MUSIC)</span>
+            `;
+        } else {
+            recordingIndicator.innerHTML = `
+                <span class="recording-pulse"></span>
+                <span>Recording (MIC ONLY)</span>
+            `;
+        }
+        
         recordingInterval = setInterval(updateRecordingTimer, 1000);
 
-        console.log('✅ 🎉 FULL KARAOKE RECORDING STARTED!');
-        console.log('🎤 Capturing: Microphone + YouTube Audio');
-        console.log('🎵 Quality: High (192kbps)');
-        console.log('📊 Mix: Voice 150% | Music 70%');
+        console.log('✅ Recording started!');
 
     } catch (error) {
         console.error('❌ Recording error:', error);
         
         if (error.name === 'NotAllowedError') {
-            alert('❌ Permission Denied\n\n' +
-                  'Microphone access is required.\n\n' +
-                  'Please allow access and try again.');
+            alert('Microphone permission denied. Please allow access and try again.');
         } else if (error.name === 'NotFoundError') {
-            alert('❌ No Microphone Found\n\n' +
-                  'Please connect a microphone or headset.');
+            alert('No microphone found. Please connect a microphone.');
         } else {
-            alert('❌ Recording Failed\n\n' + error.message);
+            alert('Recording failed: ' + error.message);
         }
         
-        cleanupStreams();
-    }
-}
-
-// Fallback: Voice-only recording
-async function startVoiceOnlyRecording() {
-    try {
-        console.log('🎤 Starting voice-only recording...');
-
-        mediaRecorder = new MediaRecorder(micStream, {
-            mimeType: 'audio/webm;codecs=opus',
-            audioBitsPerSecond: 128000
-        });
-
-        audioChunks = [];
-        mediaRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) audioChunks.push(e.data);
-        };
-        mediaRecorder.onstop = handleRecordingStop;
-
-        mediaRecorder.start(100);
-        recordingStartTime = Date.now();
-
-        if (youtubePlayer) {
-            youtubePlayer.playVideo();
-        }
-
-        startRecordBtn.style.display = 'none';
-        stopRecordBtn.style.display = 'inline-flex';
-        recordingIndicator.style.display = 'flex';
-        recordingIndicator.innerHTML = `
-            <span class="recording-pulse"></span>
-            <span>Recording (VOICE ONLY)</span>
-        `;
-        recordingInterval = setInterval(updateRecordingTimer, 1000);
-
-        console.log('✅ Voice-only recording started');
-
-    } catch (error) {
-        console.error('❌ Voice recording error:', error);
-        alert('Failed to start recording: ' + error.message);
         cleanupStreams();
     }
 }
@@ -1800,7 +1773,7 @@ function updateRecordingTimer() {
 
 function stopRecording() {
     if (!mediaRecorder || mediaRecorder.state !== 'recording') {
-        console.warn('⚠️ No active recording to stop');
+        console.warn('⚠️ No active recording');
         return;
     }
 
@@ -1808,18 +1781,15 @@ function stopRecording() {
     
     mediaRecorder.stop();
     
-    // Stop YouTube player
     if (youtubePlayer && youtubePlayer.pauseVideo) {
         youtubePlayer.pauseVideo();
     }
     
-    // Stop timer
     if (recordingInterval) {
         clearInterval(recordingInterval);
         recordingInterval = null;
     }
     
-    // Update UI
     startRecordBtn.style.display = 'inline-flex';
     stopRecordBtn.style.display = 'none';
     recordingIndicator.style.display = 'none';
@@ -1828,82 +1798,63 @@ function stopRecording() {
 }
 
 function handleRecordingStop() {
-    console.log('🎬 Processing karaoke recording...');
+    console.log('🎬 Processing recording...');
     
     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
     recordedBlob = audioBlob;
     
-    // Create preview URL
     const audioUrl = URL.createObjectURL(audioBlob);
     recordedAudio.src = audioUrl;
     
-    // Show preview
     recordedAudioPreview.style.display = 'block';
     
-    console.log('✅ Karaoke recording ready!');
-    console.log('📊 Size:', (audioBlob.size / 1024).toFixed(2), 'KB');
+    console.log('✅ Recording ready!', (audioBlob.size / 1024).toFixed(2), 'KB');
     
     cleanupStreams();
 }
 
-// Cleanup all streams and resources - ENHANCED VERSION
 function cleanupStreams() {
-    console.log('🧹 Cleaning up all streams and resources...');
+    console.log('🧹 Cleaning up streams...');
     
-    // 1. Remove ANY YouTube iframes (both visible and hidden)
-    const allIframes = document.querySelectorAll('iframe[src*="youtube.com"]');
-    allIframes.forEach(iframe => {
-        console.log('🗑️ Removing iframe:', iframe.id || 'unnamed');
-        iframe.remove();
+    // Remove iframes
+    document.querySelectorAll('iframe[src*="youtube.com"]').forEach(iframe => {
+        if (iframe.id !== 'youtubePlayer') {
+            iframe.remove();
+        }
     });
     
     if (window.karaokeIframe) {
         try {
             window.karaokeIframe.remove();
-        } catch (e) {
-            console.warn('Iframe already removed');
-        }
+        } catch (e) {}
         window.karaokeIframe = null;
     }
     
-    // 2. Stop microphone stream
+    // Stop mic
     if (micStream) {
-        micStream.getTracks().forEach(track => {
-            track.stop();
-            console.log('🛑 Stopped mic track:', track.label);
-        });
+        micStream.getTracks().forEach(track => track.stop());
         micStream = null;
     }
     
-    // 3. Stop desktop audio stream
+    // Stop desktop audio
     if (desktopStream) {
-        desktopStream.getTracks().forEach(track => {
-            track.stop();
-            console.log('🛑 Stopped desktop track:', track.label);
-        });
+        desktopStream.getTracks().forEach(track => track.stop());
         desktopStream = null;
     }
     
-    // 4. Close audio context
+    // Close audio context
     if (audioContext) {
         if (audioContext.state !== 'closed') {
-            audioContext.close().then(() => {
-                console.log('🔇 Audio context closed');
-            }).catch(e => {
-                console.warn('Error closing audio context:', e);
-            });
+            audioContext.close().catch(e => console.warn('Error closing audio context:', e));
         }
         audioContext = null;
     }
     
-    // 5. Clear destination
     mediaStreamDestination = null;
-    
-    // 6. Reset recording state
     recordingStartTime = null;
     audioChunks = [];
     
-    console.log('✅ All streams and resources cleaned up');
+    console.log('✅ Streams cleaned up');
 }
 
 async function sendKaraokeRecording() {
