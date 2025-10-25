@@ -1,0 +1,10 @@
+{
+  "appId": "com.chattymirror.app",
+  "appName": "Chatty Mirror",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  }
+}
