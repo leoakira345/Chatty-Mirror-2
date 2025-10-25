@@ -1,13 +1,20 @@
 // public/app.js
+// ==========================================
+// CAPACITOR PLATFORM DETECTION - UPDATED
+// ==========================================
+const isNativeApp = typeof window.Capacitor !== 'undefined';
+const platform = isNativeApp && window.Capacitor ? window.Capacitor.getPlatform() : 'web';
+const isAndroid = platform === 'android';
+
+console.log('🔍 Platform:', platform, '| Native:', isNativeApp, '| Android:', isAndroid);
 
 // ==========================================
 // CONFIGURATION - AUTO-DETECT ENVIRONMENT
 // ==========================================
 const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-// Automatically use the correct URL based on environment
-const API_URL = '/api';
-const SOCKET_URL = window.location.origin;
+const API_URL = 'https://chatty-mirror-2.onrender.com/api';
+const SOCKET_URL = 'https://chatty-mirror-2.onrender.com';
 
 console.log('Environment:', isDevelopment ? 'Development' : 'Production');
 console.log('Connecting to:', { API_URL, SOCKET_URL });
@@ -27,7 +34,7 @@ let messages = [];
 let typingTimeout = null;
 
 // ==========================================
-// KARAOKE STATE
+// KARAOKE STATE - UPDATED
 // ==========================================
 let youtubePlayer = null;
 let mediaRecorder = null;
@@ -40,6 +47,7 @@ let recordingInterval = null;
 let selectedVideoId = null;
 let audioContext = null;
 let mediaStreamDestination = null;
+let nativeRecordingActive = false; // NEW: Track native recording
 
 // ==========================================
 // YOUTUBE API LOADER - IMPROVED
@@ -47,7 +55,6 @@ let mediaStreamDestination = null;
 let youtubeAPIReady = false;
 let youtubeAPILoadAttempts = 0;
 
-// Load YouTube API immediately when page loads
 function loadYouTubeAPI() {
     if (window.YT && window.YT.Player) {
         youtubeAPIReady = true;
@@ -76,12 +83,10 @@ function loadYouTubeAPI() {
     firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 }
 
-// YouTube API Ready callback
 window.onYouTubeIframeAPIReady = function() {
     youtubeAPIReady = true;
     console.log('✅ YouTube IFrame API Ready!');
     
-    // Enable search button if it was disabled
     const searchBtn = document.getElementById('youtubeSearchBtn');
     if (searchBtn) {
         searchBtn.disabled = false;
@@ -92,6 +97,7 @@ window.onYouTubeIframeAPIReady = function() {
 // EMOJIS
 // ==========================================
 const emojis = ['😀', '😂', '😍', '🥰', '😎', '🤔', '👍', '❤️', '🔥', '✨', '🎉', '💯', '😊', '🙌', '💪', '🌟'];
+
 // ==========================================
 // DOM ELEMENTS
 // ==========================================
@@ -119,13 +125,11 @@ const fileInput = document.getElementById('fileInput');
 const emojiBtn = document.getElementById('emojiBtn');
 const emojiPicker = document.getElementById('emojiPicker');
 
-// Settings Modal Elements
 const settingsModal = document.getElementById('settingsModal');
 const settingsOverlay = document.getElementById('settingsOverlay');
 const closeSettingsBtn = document.getElementById('closeSettingsBtn');
 const editProfileBtn = document.getElementById('editProfileBtn');
 
-// Edit Profile Modal Elements
 const editProfileModal = document.getElementById('editProfileModal');
 const editProfileOverlay = document.getElementById('editProfileOverlay');
 const closeEditProfileBtn = document.getElementById('closeEditProfileBtn');
@@ -137,7 +141,6 @@ const profilePhotoInitial = document.getElementById('profilePhotoInitial');
 const usernameInput = document.getElementById('usernameInput');
 const saveProfileBtn = document.getElementById('saveProfileBtn');
 
-// Karaoke Modal Elements
 const karaokeBtn = document.getElementById('karaokeBtn');
 const karaokeModal = document.getElementById('karaokeModal');
 const karaokeOverlay = document.getElementById('karaokeOverlay');
@@ -267,7 +270,6 @@ function initializeSocket() {
             console.log('Emitting user_connected for:', currentUser.id);
             socket.emit('user_connected', currentUser.id);
             
-            // 👉 ADD THIS LINE
             setTimeout(() => checkServerStatus(), 1000);
         }
     });
@@ -395,7 +397,6 @@ function initializeSocket() {
     });
 }
 
-// 👉 ADD THIS NEW FUNCTION HERE
 async function checkServerStatus() {
     try {
         const response = await fetch(`${API_URL}/health`);
@@ -1379,7 +1380,7 @@ function openImageModal(imageSrc, imageName = '') {
 }
 
 // ==========================================
-// KARAOKE MODAL FUNCTIONALITY - FIXED VERSION
+// KARAOKE MODAL FUNCTIONALITY
 // ==========================================
 function setupKaraokeModal() {
     if (!karaokeBtn) {
@@ -1420,14 +1421,12 @@ function closeKaraokeModal() {
     karaokeModal.style.display = 'none';
     document.body.style.overflow = '';
     
-    // Stop recording if active
     if (mediaRecorder && mediaRecorder.state === 'recording') {
         console.log('⏹️ Stopping active recording...');
         mediaRecorder.stop();
     }
     mediaRecorder = null;
     
-    // Stop YouTube player
     if (youtubePlayer) {
         try {
             console.log('⏹️ Stopping YouTube player...');
@@ -1439,54 +1438,42 @@ function closeKaraokeModal() {
         youtubePlayer = null;
     }
     
-    // Remove hidden iframe
     if (window.karaokeIframe) {
         console.log('🗑️ Removing hidden YouTube iframe...');
         window.karaokeIframe.remove();
         window.karaokeIframe = null;
     }
     
-    // Stop timer
     if (recordingInterval) {
         clearInterval(recordingInterval);
         recordingInterval = null;
     }
     
-    // Clean up streams
     cleanupStreams();
-    
-    // Reset UI
     resetKaraokeUI();
     
     console.log('✅ Karaoke modal fully closed');
 }
 
 function resetKaraokeUI() {
-    // Clear YouTube results
     youtubeResults.style.display = 'none';
     youtubeResults.innerHTML = '';
     
-    // Hide player and preview sections
     karaokePlayerSection.style.display = 'none';
     recordedAudioPreview.style.display = 'none';
     recordingIndicator.style.display = 'none';
     
-    // Reset buttons
     startRecordBtn.style.display = 'inline-flex';
     stopRecordBtn.style.display = 'none';
     
-    // Clear search input
     youtubeSearchInput.value = '';
     
-    // Reset timer
     recordingTimer.textContent = '00:00';
     
-    // Reset state
     selectedVideoId = null;
     recordedBlob = null;
     audioChunks = [];
     
-    // Clear YouTube player div completely
     const playerDiv = document.getElementById('youtubePlayer');
     if (playerDiv) {
         playerDiv.innerHTML = '';
@@ -1563,24 +1550,20 @@ function selectYouTubeVideo(videoId, title) {
     selectedVideoId = videoId;
     console.log('🎵 Selected video:', videoId, title);
     
-    // Remove previous selection
     document.querySelectorAll('.youtube-video-item').forEach(item => {
         item.classList.remove('selected');
     });
     event.currentTarget.classList.add('selected');
     
-    // Load player
     loadYouTubePlayer(videoId);
 }
 
 function loadYouTubePlayer(videoId) {
     console.log('📺 Loading YouTube player for:', videoId);
     
-    // Show player section
     karaokePlayerSection.style.display = 'block';
     recordedAudioPreview.style.display = 'none';
     
-    // Clear any existing player
     const playerDiv = document.getElementById('youtubePlayer');
     if (playerDiv) {
         playerDiv.innerHTML = '<div style="text-align: center; padding: 2rem;">Loading player...</div>';
@@ -1595,7 +1578,6 @@ function loadYouTubePlayer(videoId) {
         youtubePlayer = null;
     }
     
-    // Check if API is ready
     if (!youtubeAPIReady) {
         console.warn('⚠️ YouTube API not ready, waiting...');
         
@@ -1609,16 +1591,14 @@ function loadYouTubePlayer(videoId) {
             </div>
         `;
         
-        // Wait for API and retry
         const checkInterval = setInterval(() => {
             if (youtubeAPIReady) {
                 clearInterval(checkInterval);
                 console.log('✅ API ready, loading player now');
-                loadYouTubePlayer(videoId); // Retry
+                loadYouTubePlayer(videoId);
             }
         }, 500);
         
-        // Timeout after 10 seconds
         setTimeout(() => {
             clearInterval(checkInterval);
             if (!youtubeAPIReady) {
@@ -1634,9 +1614,8 @@ function loadYouTubePlayer(videoId) {
         return;
     }
     
-    // API is ready, create player
     try {
-        playerDiv.innerHTML = ''; // Clear loading message
+        playerDiv.innerHTML = '';
         
         youtubePlayer = new YT.Player('youtubePlayer', {
             height: '400',
@@ -1688,13 +1667,11 @@ function onPlayerError(event) {
     
     alert(`Cannot play this video: ${message}\n\nPlease try another karaoke song.`);
     
-    // Reset UI
     karaokePlayerSection.style.display = 'none';
     youtubeResults.style.display = 'block';
 }
 
 function onPlayerStateChange(event) {
-    // Optional: Handle player state changes
     const states = {
         '-1': 'unstarted',
         '0': 'ended',
@@ -1731,17 +1708,28 @@ function startCountdown() {
         }
     }, 1000);
 }
-// MOBILE & DESKTOP COMPATIBLE RECORDING
+
+// ==========================================
+// UPDATED startRecording - NATIVE + WEB
+// ==========================================
 async function startRecording() {
     try {
         console.log('🎤 Starting karaoke recording...');
+        console.log('Platform:', platform, 'Native:', isNativeApp, 'Android:', isAndroid);
         
-        // Detect if mobile
+        // ✅ NATIVE ANDROID APP - Use internal audio capture
+        if (isNativeApp && isAndroid) {
+            console.log('📱 Android Native App - Using internal audio capture');
+            await startNativeAndroidRecording();
+            return;
+        }
+        
+        // ✅ WEB BROWSER OR iOS - Use existing method
+        console.log('🌐 Web Browser - Using standard recording');
+        
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
         
-        // Step 1: Get microphone
-        console.log('🎙️ Requesting microphone...');
+        // Get microphone
         micStream = await navigator.mediaDevices.getUserMedia({
             audio: {
                 echoCancellation: false,
@@ -1751,72 +1739,48 @@ async function startRecording() {
                 channelCount: 2
             }
         });
-        console.log('✅ Microphone captured');
 
-        // Step 2: Try desktop audio capture (only for desktop browsers)
         let finalStream;
+        let recordingMode = 'mic-only';
         
-        if (!isMobile && !isIOS) {
-            console.log('🖥️ Desktop detected - attempting tab audio capture...');
+        // Desktop browser - try tab audio
+        if (!isMobile) {
             try {
                 desktopStream = await navigator.mediaDevices.getDisplayMedia({
                     video: true,
-                    audio: {
-                        echoCancellation: false,
-                        noiseSuppression: false,
-                        autoGainControl: false,
-                        sampleRate: 48000,
-                        channelCount: 2
-                    },
+                    audio: true,
                     preferCurrentTab: true
                 });
 
                 const audioTracks = desktopStream.getAudioTracks();
-                if (audioTracks.length === 0) {
-                    throw new Error('NO_AUDIO_SELECTED');
+                if (audioTracks.length > 0) {
+                    // Mix audio
+                    audioContext = new AudioContext({ sampleRate: 48000 });
+                    const micSource = audioContext.createMediaStreamSource(micStream);
+                    const desktopSource = audioContext.createMediaStreamSource(desktopStream);
+                    
+                    const micGain = audioContext.createGain();
+                    const musicGain = audioContext.createGain();
+                    micGain.gain.value = 1.5;
+                    musicGain.gain.value = 0.7;
+                    
+                    const destination = audioContext.createMediaStreamDestination();
+                    micSource.connect(micGain).connect(destination);
+                    desktopSource.connect(musicGain).connect(destination);
+                    
+                    desktopStream.getVideoTracks().forEach(t => t.stop());
+                    finalStream = destination.stream;
+                    recordingMode = 'mic+music';
+                    console.log('✅ Desktop: Mixed audio');
                 }
-
-                console.log('✅ Desktop audio captured');
-                
-                // Remove video tracks
-                desktopStream.getVideoTracks().forEach(track => {
-                    track.stop();
-                    desktopStream.removeTrack(track);
-                });
-
-                // Mix mic + desktop audio
-                audioContext = new AudioContext({ sampleRate: 48000 });
-                const micSource = audioContext.createMediaStreamSource(micStream);
-                const desktopSource = audioContext.createMediaStreamSource(desktopStream);
-                
-                const micGain = audioContext.createGain();
-                const musicGain = audioContext.createGain();
-                
-                micGain.gain.value = 1.5;
-                musicGain.gain.value = 0.7;
-                
-                const destination = audioContext.createMediaStreamDestination();
-                
-                micSource.connect(micGain);
-                micGain.connect(destination);
-                
-                desktopSource.connect(musicGain);
-                musicGain.connect(destination);
-                
-                finalStream = destination.stream;
-                console.log('✅ Mixed audio: Mic (150%) + Music (70%)');
-                
-            } catch (displayError) {
-                console.warn('⚠️ Desktop audio failed, using mic only:', displayError.message);
+            } catch {
                 finalStream = micStream;
             }
         } else {
-            // Mobile: mic-only recording
-            console.log('📱 Mobile detected - using microphone only');
             finalStream = micStream;
         }
 
-        // Step 3: Create MediaRecorder
+        // Create MediaRecorder
         mediaRecorder = new MediaRecorder(finalStream, {
             mimeType: 'audio/webm;codecs=opus',
             audioBitsPerSecond: 192000
@@ -1827,54 +1791,105 @@ async function startRecording() {
             if (e.data.size > 0) audioChunks.push(e.data);
         };
         mediaRecorder.onstop = handleRecordingStop;
-
-        // Start recording
         mediaRecorder.start(100);
         recordingStartTime = Date.now();
 
         // Start YouTube
-        if (youtubePlayer) {
+        if (youtubePlayer?.playVideo) {
             youtubePlayer.playVideo();
         }
 
         // Update UI
-        startRecordBtn.style.display = 'none';
-        stopRecordBtn.style.display = 'inline-flex';
-        recordingIndicator.style.display = 'flex';
-        
-        if (isMobile) {
-            recordingIndicator.innerHTML = `
-                <span class="recording-pulse"></span>
-                <span>Recording (MIC ONLY)</span>
-            `;
-        } else if (desktopStream) {
-            recordingIndicator.innerHTML = `
-                <span class="recording-pulse"></span>
-                <span>Recording (MIC + MUSIC)</span>
-            `;
-        } else {
-            recordingIndicator.innerHTML = `
-                <span class="recording-pulse"></span>
-                <span>Recording (MIC ONLY)</span>
-            `;
-        }
-        
+        updateRecordingUI(recordingMode);
         recordingInterval = setInterval(updateRecordingTimer, 1000);
-
-        console.log('✅ Recording started!');
 
     } catch (error) {
         console.error('❌ Recording error:', error);
+        alert('Recording failed: ' + error.message);
+        cleanupStreams();
+    }
+}
+
+// ==========================================
+// NEW: NATIVE ANDROID RECORDING FUNCTION
+// ==========================================
+async function startNativeAndroidRecording() {
+    try {
+        // Import the native plugin
+        const { InternalAudioCapture } = await import('capacitor-internal-audio-capture');
         
-        if (error.name === 'NotAllowedError') {
-            alert('Microphone permission denied. Please allow access and try again.');
-        } else if (error.name === 'NotFoundError') {
-            alert('No microphone found. Please connect a microphone.');
-        } else {
-            alert('Recording failed: ' + error.message);
+        console.log('🔐 Requesting media projection permission...');
+        
+        // Request permission to capture internal audio
+        await InternalAudioCapture.requestPermission();
+        
+        console.log('✅ Permission granted');
+        console.log('🎙️ Starting native recording with internal audio...');
+        
+        // Start recording (captures both mic + internal audio)
+        await InternalAudioCapture.startRecording({
+            micVolume: 1.5,  // 150% microphone
+            musicVolume: 0.7  // 70% music
+        });
+        
+        // Store reference
+        nativeRecordingActive = true;
+        recordingStartTime = Date.now();
+        
+        // Start YouTube
+        if (youtubePlayer?.playVideo) {
+            youtubePlayer.playVideo();
         }
         
-        cleanupStreams();
+        // Update UI
+        startRecordBtn.style.display = 'none';
+        stopRecordBtn.style.display = 'inline-flex';
+        recordingIndicator.style.display = 'flex';
+        recordingIndicator.innerHTML = `
+            <span class="recording-pulse"></span>
+            <span>Recording (MIC + MUSIC) 🎤🎵 [NATIVE]</span>
+        `;
+        
+        recordingInterval = setInterval(updateRecordingTimer, 1000);
+        
+        console.log('✅ Native recording started successfully!');
+        
+    } catch (error) {
+        console.error('❌ Native recording error:', error);
+        
+        if (error.message?.includes('Permission denied')) {
+            alert('Permission denied. Please allow screen recording to capture internal audio.');
+        } else {
+            alert('Native recording failed: ' + error.message);
+        }
+        
+        // Fallback to web recording
+        console.log('⚠️ Falling back to web recording...');
+        nativeRecordingActive = false;
+        await startRecording();
+    }
+}
+
+// ==========================================
+// NEW: UPDATE UI HELPER
+// ==========================================
+function updateRecordingUI(mode) {
+    startRecordBtn.style.display = 'none';
+    stopRecordBtn.style.display = 'inline-flex';
+    recordingIndicator.style.display = 'flex';
+    
+    const platformLabel = isNativeApp ? '[NATIVE]' : '[WEB]';
+    
+    if (mode === 'mic+music') {
+        recordingIndicator.innerHTML = `
+            <span class="recording-pulse"></span>
+            <span>Recording (MIC + MUSIC) 🎤🎵 ${platformLabel}</span>
+        `;
+    } else {
+        recordingIndicator.innerHTML = `
+            <span class="recording-pulse"></span>
+            <span>Recording (MIC ONLY) 🎤 ${platformLabel}</span>
+        `;
     }
 }
 
@@ -1887,20 +1902,67 @@ function updateRecordingTimer() {
     recordingTimer.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-function stopRecording() {
-    if (!mediaRecorder || mediaRecorder.state !== 'recording') {
-        console.warn('⚠️ No active recording');
-        return;
-    }
-
+// ==========================================
+// UPDATED stopRecording - HANDLES NATIVE & WEB
+// ==========================================
+async function stopRecording() {
     console.log('⏹️ Stopping recording...');
     
-    mediaRecorder.stop();
-    
-    if (youtubePlayer && youtubePlayer.pauseVideo) {
-        youtubePlayer.pauseVideo();
+    // NATIVE ANDROID
+    if (nativeRecordingActive) {
+        try {
+            const { InternalAudioCapture } = await import('capacitor-internal-audio-capture');
+            
+            console.log('⏹️ Stopping native recording...');
+            const result = await InternalAudioCapture.stopRecording();
+            
+            console.log('✅ Native recording stopped');
+            console.log('📁 Audio file path:', result.path);
+            
+            // Convert file path to blob
+            const { Filesystem } = await import('@capacitor/filesystem');
+            const fileData = await Filesystem.readFile({
+                path: result.path
+            });
+            
+            // Convert base64 to blob
+            const byteCharacters = atob(fileData.data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            recordedBlob = new Blob([byteArray], { type: 'audio/webm' });
+            
+            nativeRecordingActive = false;
+            
+            // Show preview
+            const audioUrl = URL.createObjectURL(recordedBlob);
+            recordedAudio.src = audioUrl;
+            recordedAudioPreview.style.display = 'block';
+            
+            console.log('✅ Native recording processed!', (recordedBlob.size / 1024).toFixed(2), 'KB');
+            
+        } catch (error) {
+            console.error('❌ Error stopping native recording:', error);
+            alert('Failed to stop recording: ' + error.message);
+        }
+    } 
+    // WEB BROWSER
+    else {
+        if (!mediaRecorder || mediaRecorder.state !== 'recording') {
+            console.warn('⚠️ No active recording');
+            return;
+        }
+
+        mediaRecorder.stop();
+        
+        if (youtubePlayer?.pauseVideo) {
+            youtubePlayer.pauseVideo();
+        }
     }
     
+    // Common cleanup
     if (recordingInterval) {
         clearInterval(recordingInterval);
         recordingInterval = null;
@@ -1932,7 +1994,6 @@ function handleRecordingStop() {
 function cleanupStreams() {
     console.log('🧹 Cleaning up streams...');
     
-    // Remove iframes
     document.querySelectorAll('iframe[src*="youtube.com"]').forEach(iframe => {
         if (iframe.id !== 'youtubePlayer') {
             iframe.remove();
@@ -1946,19 +2007,16 @@ function cleanupStreams() {
         window.karaokeIframe = null;
     }
     
-    // Stop mic
     if (micStream) {
         micStream.getTracks().forEach(track => track.stop());
         micStream = null;
     }
     
-    // Stop desktop audio
     if (desktopStream) {
         desktopStream.getTracks().forEach(track => track.stop());
         desktopStream = null;
     }
     
-    // Close audio context
     if (audioContext) {
         if (audioContext.state !== 'closed') {
             audioContext.close().catch(e => console.warn('Error closing audio context:', e));
@@ -1969,6 +2027,7 @@ function cleanupStreams() {
     mediaStreamDestination = null;
     recordingStartTime = null;
     audioChunks = [];
+    nativeRecordingActive = false;
     
     console.log('✅ Streams cleaned up');
 }
