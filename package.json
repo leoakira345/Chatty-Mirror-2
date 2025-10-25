@@ -1,16 +1,21 @@
 {
   "name": "chatty-mirror",
   "version": "1.0.0",
+  "description": "A Node.js + Express + Socket.io backend for Chatty Mirror",
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "echo 'No build step needed for backend'"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
   "dependencies": {
+    "@capacitor/android": "^7.4.4",
+    "@capacitor/cli": "^7.4.4",
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/filesystem": "^7.1.4",
     "axios": "^1.12.2",
     "cors": "^2.8.5",
     "express": "^5.1.0",
