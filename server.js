@@ -3,6 +3,7 @@ const http = require('http');
 const socketIO = require('socket.io');
 const cors = require('cors');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const axios = require('axios');
 
@@ -18,13 +19,12 @@ const io = socketIO(server, {
     allowEIO3: true,
     pingTimeout: 60000,
     pingInterval: 25000,
-    maxHttpBufferSize: 10e6 // 10MB for large audio files
+    maxHttpBufferSize: 10e6
 });
 
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
 
-// Middleware
 app.use(cors({
     origin: "*",
     credentials: true
@@ -33,26 +33,50 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(express.static('public'));
 
-// Data directory
 const DATA_DIR = path.join(__dirname, 'data');
-
-// Store active users and their socket IDs
 const activeUsers = new Map();
-
-// YouTube API Key
+const writeLocks = new Map(); // Track ongoing write operations
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || 'AIzaSyC1xGrajAjGg67nL6QjCAJn5ZXSg8mPtTg';
 
-// Ensure data directory exists
 async function ensureDataDirectory() {
     try {
         await fs.mkdir(DATA_DIR, { recursive: true });
         console.log('✅ Data directory ready');
+        
+        // Clean up any orphaned temp files on startup
+        await cleanupTempFiles();
     } catch (error) {
         console.error('❌ Error creating data directory:', error);
     }
 }
 
-// Helper function to read JSON file with better error handling
+async function cleanupTempFiles() {
+    try {
+        const files = await fs.readdir(DATA_DIR);
+        const tempFiles = files.filter(f => f.endsWith('.tmp'));
+        
+        if (tempFiles.length > 0) {
+            console.log(`🧹 Cleaning up ${tempFiles.length} temporary files...`);
+            
+            for (const tempFile of tempFiles) {
+                const tempPath = path.join(DATA_DIR, tempFile);
+                try {
+                    const stats = await fs.stat(tempPath);
+                    // Delete temp files older than 1 minute
+                    if (Date.now() - stats.mtimeMs > 60000) {
+                        await fs.unlink(tempPath);
+                        console.log(`   Deleted: ${tempFile}`);
+                    }
+                } catch (err) {
+                    // File might have been deleted already
+                }
+            }
+        }
+    } catch (error) {
+        console.error('⚠️  Error cleaning temp files:', error.message);
+    }
+}
+
 async function readJSON(filename) {
     try {
         const filePath = path.join(DATA_DIR, filename);
@@ -68,13 +92,9 @@ async function readJSON(filename) {
             return parsed;
         } catch (parseError) {
             console.error(`❌ JSON Parse Error in ${filename}:`, parseError.message);
-            console.error(`   File size: ${data.length} bytes`);
-            console.error(`   First 100 chars: ${data.substring(0, 100)}`);
-            
             const backupPath = path.join(DATA_DIR, `${filename}.corrupted.${Date.now()}`);
             await fs.writeFile(backupPath, data, 'utf8');
             console.log(`   Backed up to: ${backupPath}`);
-            
             return null;
         }
     } catch (error) {
@@ -86,12 +106,29 @@ async function readJSON(filename) {
     }
 }
 
-// Helper function to write JSON file with validation
+// IMPROVED: Atomic writes with file locking
 async function writeJSON(filename, data) {
+    const filePath = path.join(DATA_DIR, filename);
+    const tempPath = filePath + '.tmp';
+    
+    // Wait if there's already a write operation for this file
+    let waitCount = 0;
+    while (writeLocks.get(filename)) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+        waitCount++;
+        if (waitCount > 100) { // 1 second timeout
+            console.error(`⚠️  Write lock timeout for ${filename}`);
+            break;
+        }
+    }
+    
+    // Lock this file for writing
+    writeLocks.set(filename, true);
+    
     try {
-        const filePath = path.join(DATA_DIR, filename);
-        
         let jsonString;
+        
+        // Step 1: Stringify data
         try {
             jsonString = JSON.stringify(data, null, 2);
         } catch (stringifyError) {
@@ -99,6 +136,7 @@ async function writeJSON(filename, data) {
             return false;
         }
         
+        // Step 2: Validate the JSON string
         try {
             JSON.parse(jsonString);
         } catch (validateError) {
@@ -106,15 +144,42 @@ async function writeJSON(filename, data) {
             return false;
         }
         
-        await fs.writeFile(filePath, jsonString, 'utf8');
+        // Step 3: Write to temporary file first (atomic operation)
+        await fs.writeFile(tempPath, jsonString, 'utf8');
+        
+        // Step 4: Verify the temporary file is valid
+        try {
+            const verifyData = await fs.readFile(tempPath, 'utf8');
+            JSON.parse(verifyData); // Will throw if corrupted
+        } catch (verifyError) {
+            console.error('❌ Temporary file verification failed:', verifyError);
+            await fs.unlink(tempPath);
+            return false;
+        }
+        
+        // Step 5: Atomically replace the old file with the new one
+        // This is atomic on most filesystems
+        await fs.rename(tempPath, filePath);
+        
         return true;
+        
     } catch (error) {
-        console.error('❌ Error writing JSON:', error);
+        console.error(`❌ Error writing JSON ${filename}:`, error);
+        
+        // Clean up temporary file if it exists
+        try {
+            await fs.unlink(tempPath);
+        } catch (unlinkError) {
+            // Ignore if temp file doesn't exist
+        }
+        
         return false;
+    } finally {
+        // Always release the lock
+        writeLocks.delete(filename);
     }
 }
 
-// Helper function to parse YouTube duration format (PT4M13S -> seconds)
 function parseDuration(duration) {
     try {
         const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
@@ -131,7 +196,6 @@ function parseDuration(duration) {
     }
 }
 
-// Generate unique 4-digit user ID
 async function generateUniqueUserId() {
     let userId;
     let isUnique = false;
@@ -147,21 +211,51 @@ async function generateUniqueUserId() {
     return userId;
 }
 
-// Socket.IO Connection
 io.on('connection', (socket) => {
     console.log('🔌 New client connected:', socket.id);
 
-    // User connects
-    socket.on('user_connected', (userId) => {
+    socket.on('user_connected', async (userId) => {
+        if (activeUsers.has(userId)) {
+            const oldSocketId = activeUsers.get(userId);
+            console.log(`🔄 User ${userId} reconnecting, removing old socket ${oldSocketId}`);
+        }
+        
         activeUsers.set(userId, socket.id);
         socket.userId = userId;
         console.log(`👤 User ${userId} connected with socket ${socket.id}`);
         console.log(`📊 Total active users: ${activeUsers.size}`);
         
         socket.broadcast.emit('user_status', { userId, status: 'online' });
+        
+        try {
+            const files = await fs.readdir(DATA_DIR);
+            const messageFiles = files.filter(f => 
+                f.startsWith('messages_') && 
+                f.includes(userId) && 
+                f.endsWith('.json')
+            );
+            
+            for (const file of messageFiles) {
+                const messagesData = await readJSON(file);
+                if (messagesData && messagesData.messages) {
+                    const undeliveredMessages = messagesData.messages.filter(m => 
+                        m.receiverId === userId && 
+                        m.status === 'sent'
+                    );
+                    
+                    if (undeliveredMessages.length > 0) {
+                        console.log(`📬 Delivering ${undeliveredMessages.length} pending messages to ${userId}`);
+                        undeliveredMessages.forEach(msg => {
+                            socket.emit('new_message', msg);
+                        });
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error delivering pending messages:', error);
+        }
     });
 
-    // User sends message (handles text, images, videos, files, AND audio/karaoke)
     socket.on('send_message', async (data) => {
         console.log('\n' + '='.repeat(60));
         console.log('📨 INCOMING MESSAGE EVENT');
@@ -173,48 +267,17 @@ io.on('connection', (socket) => {
         console.log('  - From:', senderId);
         console.log('  - To:', receiverId);
         console.log('  - Type:', type);
-        console.log('  - Content length:', content ? content.length : 0);
-        
-        if (type === 'image' || type === 'video' || type === 'file' || type === 'audio') {
-            try {
-                const parsed = JSON.parse(content);
-                console.log('  - File name:', parsed.name);
-                console.log('  - File type:', parsed.type);
-                console.log('  - File size:', parsed.size, 'bytes');
-                console.log('  - Data length:', parsed.data ? parsed.data.length : 0);
-                
-                if (type === 'audio') {
-                    console.log('🎤 KARAOKE/AUDIO MESSAGE DETECTED');
-                }
-            } catch (e) {
-                console.log('  - Could not parse file data');
-            }
-        } else {
-            console.log('  - Text preview:', content ? content.substring(0, 50) : 'empty');
-        }
         
         try {
-            // Validate required fields
-            if (!senderId) {
-                throw new Error('Missing senderId');
-            }
-            if (!receiverId) {
-                throw new Error('Missing receiverId');
-            }
-            if (!content) {
-                throw new Error('Missing content');
-            }
-            if (!type) {
-                throw new Error('Missing type');
+            if (!senderId || !receiverId || !content || !type) {
+                throw new Error('Missing required fields');
             }
 
             console.log('✅ Validation passed');
 
-            // Create consistent chat ID (sorted IDs)
             const chatId = [senderId, receiverId].sort().join('_');
             console.log('💾 Chat ID:', chatId);
             
-            // Create complete message object WITH STATUS
             const message = {
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                 senderId: senderId,
@@ -228,7 +291,6 @@ io.on('connection', (socket) => {
             
             console.log('📝 Message ID:', message.id);
             
-            // Load existing messages
             let messagesData = await readJSON(`messages_${chatId}.json`);
             console.log('📂 Existing messages:', messagesData ? messagesData.messages?.length : 0);
             
@@ -237,17 +299,14 @@ io.on('connection', (socket) => {
                 console.log('📂 Creating new messages file');
             }
             
-            // Ensure messages array exists
             if (!Array.isArray(messagesData.messages)) {
                 console.log('⚠️  Messages was not an array, creating new array');
                 messagesData.messages = [];
             }
             
-            // Add new message
             messagesData.messages.push(message);
             console.log('📊 Total messages in chat:', messagesData.messages.length);
             
-            // Save messages to file
             const saved = await writeJSON(`messages_${chatId}.json`, messagesData);
             
             if (!saved) {
@@ -256,24 +315,29 @@ io.on('connection', (socket) => {
             
             console.log('✅ Message saved to file successfully');
             
-            // Send confirmation to sender
             socket.emit('message_sent', { 
                 success: true, 
                 message: message 
             });
             console.log('✅ Confirmation sent to sender:', senderId);
             
-            // Check if receiver is online
             const receiverSocketId = activeUsers.get(receiverId);
             console.log('🔍 Looking for receiver:', receiverId);
+            console.log('🔍 Active users map:', Array.from(activeUsers.keys()));
             console.log('🔍 Receiver socket ID:', receiverSocketId || 'NOT FOUND');
             
             if (receiverSocketId) {
-                io.to(receiverSocketId).emit('new_message', message);
-                console.log('✅ Message emitted to receiver socket:', receiverSocketId);
-                
-                if (type === 'audio') {
-                    console.log('🎤 Karaoke recording delivered to receiver');
+                const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+                if (receiverSocket) {
+                    receiverSocket.emit('new_message', message);
+                    console.log('✅ Message emitted to receiver socket:', receiverSocketId);
+                    
+                    if (type === 'audio') {
+                        console.log('🎤 Karaoke recording delivered to receiver');
+                    }
+                } else {
+                    console.log('⚠️  Receiver socket ID exists but socket is disconnected');
+                    activeUsers.delete(receiverId);
                 }
             } else {
                 console.log('💤 Receiver is offline - message saved for later delivery');
@@ -295,7 +359,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // User typing indicator
     socket.on('typing', (data) => {
         const { senderId, receiverId } = data;
         const receiverSocketId = activeUsers.get(receiverId);
@@ -304,7 +367,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // User stopped typing
     socket.on('stop_typing', (data) => {
         const { senderId, receiverId } = data;
         const receiverSocketId = activeUsers.get(receiverId);
@@ -313,7 +375,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Mark message as seen
     socket.on('mark_seen', async (data) => {
         const { messageId, userId } = data;
         
@@ -366,7 +427,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // User disconnects
     socket.on('disconnect', () => {
         let disconnectedUserId = null;
         for (const [userId, socketId] of activeUsers.entries()) {
@@ -398,7 +458,7 @@ app.get('/', (req, res) => {
     res.json({
         success: true,
         message: 'Chatty Mirror Server is running',
-        version: '2.4-karaoke-iframe-method',
+        version: '2.6-atomic-writes',
         activeUsers: activeUsers.size,
         features: [
             'Text messaging',
@@ -406,10 +466,9 @@ app.get('/', (req, res) => {
             'Video sharing',
             'File sharing',
             'Audio messages',
-            'Karaoke recordings with YouTube Iframe API',
-            'Real-time typing indicators',
-            'Message seen status',
-            'Online/offline status'
+            'Karaoke recordings',
+            'Atomic file writes',
+            'Corruption prevention'
         ]
     });
 });
@@ -436,15 +495,24 @@ app.post('/api/user/init', async (req, res) => {
 
 app.get('/api/user/:userId', async (req, res) => {
     try {
-        const { userId } = req.params;
+        let { userId } = req.params;
+        
+        userId = userId.trim();
+        
+        console.log(`🔍 Searching for user: "${userId}"`);
         
         if (!/^\d{4}$/.test(userId)) {
-            return res.json({ success: false, message: 'Invalid user ID' });
+            console.log(`❌ Invalid format: "${userId}"`);
+            return res.json({ 
+                success: false, 
+                message: 'User ID must be exactly 4 digits' 
+            });
         }
         
         const user = await readJSON(`user_${userId}.json`);
         
         if (user) {
+            console.log(`✅ User found: ${userId}`);
             res.json({
                 success: true,
                 user: {
@@ -455,11 +523,18 @@ app.get('/api/user/:userId', async (req, res) => {
                 }
             });
         } else {
-            res.json({ success: false, message: 'User not found' });
+            console.log(`❌ User not found: ${userId}`);
+            res.json({ 
+                success: false, 
+                message: 'User not found' 
+            });
         }
     } catch (error) {
         console.error('❌ Error getting user:', error);
-        res.status(500).json({ success: false, message: 'Failed to get user' });
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to get user' 
+        });
     }
 });
 
@@ -534,39 +609,94 @@ app.post('/api/friends/add', async (req, res) => {
     try {
         const { userId, friendId } = req.body;
         
+        console.log(`👥 Friend add request: ${userId} -> ${friendId}`);
+        
         if (!userId || !friendId) {
             return res.json({ success: false, message: 'Missing userId or friendId' });
         }
         
+        if (userId === friendId) {
+            return res.json({ success: false, message: 'Cannot add yourself as friend' });
+        }
+        
+        const user = await readJSON(`user_${userId}.json`);
         const friendUser = await readJSON(`user_${friendId}.json`);
+        
+        if (!user) {
+            return res.json({ success: false, message: 'Your user account not found' });
+        }
+        
         if (!friendUser) {
             return res.json({ success: false, message: 'User not found' });
         }
         
         let userFriends = await readJSON(`friends_${userId}.json`) || { friendIds: [] };
+        if (!Array.isArray(userFriends.friendIds)) {
+            userFriends.friendIds = [];
+        }
+        
         if (!userFriends.friendIds.includes(friendId)) {
             userFriends.friendIds.push(friendId);
             await writeJSON(`friends_${userId}.json`, userFriends);
+            console.log(`✅ Added ${friendId} to ${userId}'s friend list`);
+        } else {
+            console.log(`ℹ️  ${friendId} already in ${userId}'s friend list`);
         }
         
         let friendFriends = await readJSON(`friends_${friendId}.json`) || { friendIds: [] };
+        if (!Array.isArray(friendFriends.friendIds)) {
+            friendFriends.friendIds = [];
+        }
+        
         if (!friendFriends.friendIds.includes(userId)) {
             friendFriends.friendIds.push(userId);
             await writeJSON(`friends_${friendId}.json`, friendFriends);
+            console.log(`✅ Added ${userId} to ${friendId}'s friend list`);
+        } else {
+            console.log(`ℹ️  ${userId} already in ${friendId}'s friend list`);
         }
         
         const userSocketId = activeUsers.get(userId);
         const friendSocketId = activeUsers.get(friendId);
         
-        if (userSocketId) io.to(userSocketId).emit('friend_added', { friendId });
-        if (friendSocketId) io.to(friendSocketId).emit('friend_added', { friendId: userId });
+        console.log(`🔍 User ${userId} socket: ${userSocketId || 'offline'}`);
+        console.log(`🔍 Friend ${friendId} socket: ${friendSocketId || 'offline'}`);
         
-        console.log(`👥 Friend added: ${userId} <-> ${friendId}`);
+        if (userSocketId) {
+            const userSocket = io.sockets.sockets.get(userSocketId);
+            if (userSocket) {
+                userSocket.emit('friend_added', { 
+                    friendId: friendId,
+                    friend: friendUser 
+                });
+                console.log(`✅ Notified user ${userId} about new friend`);
+            }
+        }
         
-        res.json({ success: true, message: 'Friend added successfully' });
+        if (friendSocketId) {
+            const friendSocket = io.sockets.sockets.get(friendSocketId);
+            if (friendSocket) {
+                friendSocket.emit('friend_added', { 
+                    friendId: userId,
+                    friend: user 
+                });
+                console.log(`✅ Notified friend ${friendId} about new friend`);
+            }
+        }
+        
+        console.log(`✅ Friend relationship established: ${userId} <-> ${friendId}`);
+        
+        res.json({ 
+            success: true, 
+            message: 'Friend added successfully',
+            friend: friendUser
+        });
     } catch (error) {
         console.error('❌ Error adding friend:', error);
-        res.status(500).json({ success: false, message: 'Failed to add friend' });
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to add friend: ' + error.message 
+        });
     }
 });
 
@@ -594,12 +724,13 @@ app.get('/api/health', (req, res) => {
         success: true,
         message: 'Server is running',
         activeUsers: activeUsers.size,
+        activeUsersList: Array.from(activeUsers.keys()),
+        writeLocks: writeLocks.size,
         timestamp: Date.now(),
-        version: '2.4-karaoke-iframe-method'
+        version: '2.6-atomic-writes'
     });
 });
 
-// Fix corrupted messages file
 app.post('/api/messages/fix/:chatId', async (req, res) => {
     try {
         const { chatId } = req.params;
@@ -628,7 +759,6 @@ app.post('/api/messages/fix/:chatId', async (req, res) => {
     }
 });
 
-// Get karaoke recordings for a user
 app.get('/api/karaoke/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -661,7 +791,6 @@ app.get('/api/karaoke/:userId', async (req, res) => {
     }
 });
 
-// YouTube Search Proxy - FIXED VERSION WITH EMBEDDABLE FILTER
 app.get('/api/youtube/search', async (req, res) => {
     try {
         const query = req.query.q;
@@ -675,18 +804,16 @@ app.get('/api/youtube/search', async (req, res) => {
 
         console.log('🔍 YouTube search request:', query);
 
-        // Check if API key is set
         if (!YOUTUBE_API_KEY || YOUTUBE_API_KEY === 'YOUR_API_KEY_HERE') {
             console.error('❌ YouTube API key not configured');
             return res.json({
                 success: false,
-                message: 'YouTube API key not configured. Please add your API key to server.js',
+                message: 'YouTube API key not configured',
                 results: []
             });
         }
 
         try {
-            // Step 1: Search for videos with embeddable filter
             const searchUrl = `https://www.googleapis.com/youtube/v3/search`;
             const searchParams = {
                 part: 'snippet',
@@ -699,7 +826,7 @@ app.get('/api/youtube/search', async (req, res) => {
                 videoSyndicated: 'true'
             };
 
-            console.log('🔍 Calling YouTube Data API (Search with embeddable filter)...');
+            console.log('🔍 Calling YouTube Data API...');
             
             const searchResponse = await axios.get(searchUrl, { params: searchParams });
 
@@ -713,20 +840,18 @@ app.get('/api/youtube/search', async (req, res) => {
                     key: YOUTUBE_API_KEY
                 };
 
-                console.log('🔍 Getting video details to verify embeddability...');
                 const videosResponse = await axios.get(videosUrl, { params: videosParams });
 
                 const embeddableVideos = videosResponse.data.items.filter(video => 
                     video.status && video.status.embeddable === true
                 );
 
-                console.log(`✅ Found ${embeddableVideos.length} embeddable videos out of ${searchResponse.data.items.length} total`);
+                console.log(`✅ Found ${embeddableVideos.length} embeddable videos`);
 
                 if (embeddableVideos.length === 0) {
-                    console.log('⚠️ No embeddable videos found after filtering');
                     res.json({
                         success: false,
-                        message: 'No embeddable karaoke videos found. Try a different search term.',
+                        message: 'No embeddable karaoke videos found',
                         results: []
                     });
                 } else {
@@ -739,29 +864,21 @@ app.get('/api/youtube/search', async (req, res) => {
                             { 
                                 url: video.snippet.thumbnails.medium?.url || video.snippet.thumbnails.default?.url, 
                                 quality: 'medium' 
-                            },
-                            { 
-                                url: video.snippet.thumbnails.high?.url || video.snippet.thumbnails.medium?.url, 
-                                quality: 'high' 
                             }
                         ],
                         embeddable: true
                     }));
 
-                    console.log(`✅ Returning ${results.length} embeddable karaoke videos`);
-
                     res.json({
                         success: true,
                         results: results,
-                        source: 'YouTube Data API v3 (Embeddable Only)',
-                        info: 'All videos are verified to be embeddable'
+                        source: 'YouTube Data API v3'
                     });
                 }
             } else {
-                console.log('❌ No results found in initial search');
                 res.json({
                     success: false,
-                    message: 'No results found for this search.',
+                    message: 'No results found',
                     results: []
                 });
             }
@@ -771,19 +888,13 @@ app.get('/api/youtube/search', async (req, res) => {
             if (apiError.response?.status === 403) {
                 res.json({
                     success: false,
-                    message: 'YouTube API quota exceeded or invalid API key. Please check your API key.',
-                    results: []
-                });
-            } else if (apiError.response?.status === 400) {
-                res.json({
-                    success: false,
-                    message: 'Invalid search query. Please try different search terms.',
+                    message: 'YouTube API quota exceeded or invalid API key',
                     results: []
                 });
             } else {
                 res.json({
                     success: false,
-                    message: 'Failed to search YouTube. Please try again.',
+                    message: 'Failed to search YouTube',
                     results: []
                 });
             }
@@ -792,7 +903,7 @@ app.get('/api/youtube/search', async (req, res) => {
         console.error('❌ YouTube search error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to search YouTube. Please try again.',
+            message: 'Failed to search YouTube',
             error: error.message
         });
     }
@@ -803,16 +914,14 @@ async function startServer() {
     
     server.listen(PORT, HOST, () => {
         console.log('\n' + '='.repeat(60));
-        console.log('  🚀 CHATTY MIRROR SERVER');
+        console.log('  🚀 CHATTY MIRROR SERVER - ATOMIC WRITES VERSION');
         console.log('='.repeat(60));
         console.log(`  ✅ Server: http://localhost:${PORT}`);
-        console.log(`  ✅ Version: 2.4 (Karaoke Iframe Method)`);
-        console.log(`  🎤 Features: Text, Images, Videos, Files, Karaoke`);
-        console.log(`  🎵 YouTube: Iframe API for audio capture`);
-        console.log(`  🔒 YouTube: Embeddable videos only`);
+        console.log(`  ✅ Version: 2.6 (Atomic Writes)`);
+        console.log(`  🔒 Features: Corruption prevention, file locking`);
+        console.log(`  🎤 Karaoke: Text, Images, Videos, Files, Audio`);
         console.log('='.repeat(60) + '\n');
     });
 }
 
 startServer();
-
