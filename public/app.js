@@ -41,18 +41,57 @@ let selectedVideoId = null;
 let audioContext = null;
 let mediaStreamDestination = null;
 
-// YouTube API Ready
+// ==========================================
+// YOUTUBE API LOADER - IMPROVED
+// ==========================================
 let youtubeAPIReady = false;
+let youtubeAPILoadAttempts = 0;
+
+// Load YouTube API immediately when page loads
+function loadYouTubeAPI() {
+    if (window.YT && window.YT.Player) {
+        youtubeAPIReady = true;
+        console.log('✅ YouTube API already loaded');
+        return;
+    }
+
+    if (document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+        console.log('⏳ YouTube API script already added, waiting...');
+        return;
+    }
+
+    console.log('📺 Loading YouTube IFrame API...');
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    tag.async = true;
+    tag.onerror = () => {
+        console.error('❌ Failed to load YouTube API');
+        if (youtubeAPILoadAttempts < 3) {
+            youtubeAPILoadAttempts++;
+            console.log(`🔄 Retrying... (${youtubeAPILoadAttempts}/3)`);
+            setTimeout(loadYouTubeAPI, 2000);
+        }
+    };
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+}
+
+// YouTube API Ready callback
 window.onYouTubeIframeAPIReady = function() {
     youtubeAPIReady = true;
-    console.log('✅ YouTube API Ready');
+    console.log('✅ YouTube IFrame API Ready!');
+    
+    // Enable search button if it was disabled
+    const searchBtn = document.getElementById('youtubeSearchBtn');
+    if (searchBtn) {
+        searchBtn.disabled = false;
+    }
 };
 
 // ==========================================
 // EMOJIS
 // ==========================================
 const emojis = ['😀', '😂', '😍', '🥰', '😎', '🤔', '👍', '❤️', '🔥', '✨', '🎉', '💯', '😊', '🙌', '💪', '🌟'];
-
 // ==========================================
 // DOM ELEMENTS
 // ==========================================
@@ -121,6 +160,7 @@ const countdownNumber = document.getElementById('countdownNumber');
 // INITIALIZE
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
+    loadYouTubeAPI();
     await initializeApp();
     setupEventListeners();
     initializeEmojiPicker();
@@ -1543,7 +1583,7 @@ function loadYouTubePlayer(videoId) {
     // Clear any existing player
     const playerDiv = document.getElementById('youtubePlayer');
     if (playerDiv) {
-        playerDiv.innerHTML = '';
+        playerDiv.innerHTML = '<div style="text-align: center; padding: 2rem;">Loading player...</div>';
     }
     
     if (youtubePlayer) {
@@ -1555,38 +1595,115 @@ function loadYouTubePlayer(videoId) {
         youtubePlayer = null;
     }
     
-    // Create new player
+    // Check if API is ready
     if (!youtubeAPIReady) {
-        alert('YouTube player is loading. Please wait a moment and try again.');
+        console.warn('⚠️ YouTube API not ready, waiting...');
+        
+        playerDiv.innerHTML = `
+            <div style="text-align: center; padding: 2rem; color: #6b7280;">
+                <svg class="icon animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 48px; height: 48px; margin: 0 auto 1rem;">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                </svg>
+                <p>Loading YouTube player...</p>
+                <p style="font-size: 0.875rem; margin-top: 0.5rem;">Please wait a moment</p>
+            </div>
+        `;
+        
+        // Wait for API and retry
+        const checkInterval = setInterval(() => {
+            if (youtubeAPIReady) {
+                clearInterval(checkInterval);
+                console.log('✅ API ready, loading player now');
+                loadYouTubePlayer(videoId); // Retry
+            }
+        }, 500);
+        
+        // Timeout after 10 seconds
+        setTimeout(() => {
+            clearInterval(checkInterval);
+            if (!youtubeAPIReady) {
+                playerDiv.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: #ef4444;">
+                        <p>❌ Failed to load YouTube player</p>
+                        <button onclick="location.reload()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #3b82f6; color: white; border: none; border-radius: 0.5rem; cursor: pointer;">Refresh Page</button>
+                    </div>
+                `;
+            }
+        }, 10000);
+        
         return;
     }
     
-    youtubePlayer = new YT.Player('youtubePlayer', {
-        height: '400',
-        width: '100%',
-        videoId: videoId,
-        playerVars: {
-            'autoplay': 0,
-            'controls': 1,
-            'modestbranding': 1,
-            'rel': 0
-        },
-        events: {
-            'onReady': onPlayerReady,
-            'onError': onPlayerError
-        }
-    });
-    
-    console.log('✅ YouTube player created');
+    // API is ready, create player
+    try {
+        playerDiv.innerHTML = ''; // Clear loading message
+        
+        youtubePlayer = new YT.Player('youtubePlayer', {
+            height: '400',
+            width: '100%',
+            videoId: videoId,
+            playerVars: {
+                'autoplay': 0,
+                'controls': 1,
+                'modestbranding': 1,
+                'rel': 0,
+                'fs': 1,
+                'playsinline': 1
+            },
+            events: {
+                'onReady': onPlayerReady,
+                'onError': onPlayerError,
+                'onStateChange': onPlayerStateChange
+            }
+        });
+        
+        console.log('✅ YouTube player created successfully');
+    } catch (error) {
+        console.error('❌ Error creating player:', error);
+        playerDiv.innerHTML = `
+            <div style="text-align: center; padding: 2rem; color: #ef4444;">
+                <p>❌ Error loading video</p>
+                <p style="font-size: 0.875rem; margin-top: 0.5rem;">${error.message}</p>
+            </div>
+        `;
+    }
 }
 
 function onPlayerReady(event) {
-    console.log('✅ YouTube player ready');
+    console.log('✅ YouTube player ready and loaded');
 }
 
 function onPlayerError(event) {
     console.error('❌ YouTube player error:', event.data);
-    alert('Error loading video. Please try another one.');
+    
+    const errorMessages = {
+        2: 'Invalid video ID',
+        5: 'HTML5 player error',
+        100: 'Video not found or private',
+        101: 'Video cannot be embedded',
+        150: 'Video cannot be embedded'
+    };
+    
+    const message = errorMessages[event.data] || 'Unknown error';
+    
+    alert(`Cannot play this video: ${message}\n\nPlease try another karaoke song.`);
+    
+    // Reset UI
+    karaokePlayerSection.style.display = 'none';
+    youtubeResults.style.display = 'block';
+}
+
+function onPlayerStateChange(event) {
+    // Optional: Handle player state changes
+    const states = {
+        '-1': 'unstarted',
+        '0': 'ended',
+        '1': 'playing',
+        '2': 'paused',
+        '3': 'buffering',
+        '5': 'video cued'
+    };
+    console.log('▶️ Player state:', states[event.data] || event.data);
 }
 
 function startCountdown() {
@@ -1614,7 +1731,6 @@ function startCountdown() {
         }
     }, 1000);
 }
-
 // MOBILE & DESKTOP COMPATIBLE RECORDING
 async function startRecording() {
     try {
