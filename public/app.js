@@ -229,6 +229,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupSettingsModal();
     setupImageModal();
     setupKaraokeModal();
+    setupPaintModal(); // Add this line
     setupLogoutButton(); // ✅ ADD THIS LINE
 });
 
@@ -2378,3 +2379,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 window.showLogoutConfirmation = showLogoutConfirmation;
 window.hideLogoutConfirmation = hideLogoutConfirmation;
 window.performLogout = performLogout;
+
+// Music Studio Button - Opens studio.html in new window
+document.getElementById('openMusicBtn')?.addEventListener('click', () => {
+    window.open('studio.html', 'MusicStudio', 'width=1600,height=900,resizable=yes,scrollbars=yes');
+});
