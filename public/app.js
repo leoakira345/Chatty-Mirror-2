@@ -1,5 +1,53 @@
 // public/app.js
 // ==========================================
+// ADD THIS AT THE VERY BEGINNING OF app.js
+// BEFORE ANY OTHER CODE
+// ==========================================
+
+// Check if user is authenticated
+function checkAuthentication() {
+    const storedUser = localStorage.getItem('chatty_mirror_user');
+    
+    // If no user is stored, redirect to auth page
+    if (!storedUser) {
+        console.log('❌ No authenticated user found, redirecting to login...');
+        window.location.href = 'auth.html';
+        return false;
+    }
+    
+    try {
+        const user = JSON.parse(storedUser);
+        
+        // Check if user object has required fields
+        if (!user.id || !user.username) {
+            console.log('❌ Invalid user data, redirecting to login...');
+            localStorage.removeItem('chatty_mirror_user');
+            window.location.href = 'auth.html';
+            return false;
+        }
+        
+        console.log('✅ User authenticated:', user.id);
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Error parsing user data:', error);
+        localStorage.removeItem('chatty_mirror_user');
+        window.location.href = 'auth.html';
+        return false;
+    }
+}
+
+// Run authentication check immediately
+if (!checkAuthentication()) {
+    // Stop script execution if not authenticated
+    throw new Error('Authentication required');
+}
+
+// ==========================================
+// REST OF YOUR EXISTING app.js CODE CONTINUES BELOW
+// ==========================================
+
+// ==========================================
 // CAPACITOR PLATFORM DETECTION - UPDATED
 // ==========================================
 const isNativeApp = typeof window.Capacitor !== 'undefined';
@@ -11,13 +59,22 @@ console.log('🔍 Platform:', platform, '| Native:', isNativeApp, '| Android:', 
 // ==========================================
 // CONFIGURATION - AUTO-DETECT ENVIRONMENT
 // ==========================================
-const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const isDevelopment = window.location.hostname === 'localhost' || 
+                      window.location.hostname === '127.0.0.1' ||
+                      window.location.hostname === '';
 
-const API_URL = 'https://chatty-mirror-2.onrender.com/api';
-const SOCKET_URL = 'https://chatty-mirror-2.onrender.com';
+// ✅ FIX: Use local server for development
+const API_URL = isDevelopment 
+    ? 'http://localhost:3000/api'  // ✅ Local server
+    : 'https://chatty-mirror-2.onrender.com/api';  // Production server
 
-console.log('Environment:', isDevelopment ? 'Development' : 'Production');
-console.log('Connecting to:', { API_URL, SOCKET_URL });
+const SOCKET_URL = isDevelopment
+    ? 'http://localhost:3000'  // ✅ Local server
+    : 'https://chatty-mirror-2.onrender.com';  // Production server
+
+console.log('🔧 Environment:', isDevelopment ? 'Development (Local)' : 'Production');
+console.log('🔧 API URL:', API_URL);
+console.log('🔧 Socket URL:', SOCKET_URL);
 
 // ==========================================
 // SOCKET.IO
@@ -172,6 +229,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupSettingsModal();
     setupImageModal();
     setupKaraokeModal();
+    setupLogoutButton(); // ✅ ADD THIS LINE
 });
 
 async function initializeApp() {
@@ -1811,32 +1869,37 @@ async function startRecording() {
 }
 
 // ==========================================
-// NEW: NATIVE ANDROID RECORDING FUNCTION
+// NATIVE ANDROID RECORDING - FIXED
 // ==========================================
 async function startNativeAndroidRecording() {
     try {
-        // Import the native plugin
-        const { InternalAudioCapture } = await import('capacitor-internal-audio-capture');
+        console.log('📱 Starting native Android recording...');
         
-        console.log('🔐 Requesting media projection permission...');
+        // Access the custom plugin from Capacitor
+        const InternalAudioCapture = window.Capacitor.Plugins.InternalAudioCapture;
         
-        // Request permission to capture internal audio
-        await InternalAudioCapture.requestPermission();
+        if (!InternalAudioCapture) {
+            throw new Error('InternalAudioCapture plugin not found');
+        }
         
-        console.log('✅ Permission granted');
-        console.log('🎙️ Starting native recording with internal audio...');
+        console.log('✅ Plugin found, requesting permission...');
         
-        // Start recording (captures both mic + internal audio)
-        await InternalAudioCapture.startRecording({
-            micVolume: 1.5,  // 150% microphone
-            musicVolume: 0.7  // 70% music
-        });
+        // Request permission (this will show Android system dialogs)
+        const permResult = await InternalAudioCapture.requestPermission();
         
-        // Store reference
+        if (!permResult.granted) {
+            throw new Error('Permission denied by user');
+        }
+        
+        console.log('✅ Permission granted, starting recording...');
+        
+        // Start recording
+        await InternalAudioCapture.startRecording();
+        
         nativeRecordingActive = true;
         recordingStartTime = Date.now();
         
-        // Start YouTube
+        // Start YouTube video
         if (youtubePlayer?.playVideo) {
             youtubePlayer.playVideo();
         }
@@ -1847,7 +1910,7 @@ async function startNativeAndroidRecording() {
         recordingIndicator.style.display = 'flex';
         recordingIndicator.innerHTML = `
             <span class="recording-pulse"></span>
-            <span>Recording (MIC + MUSIC) 🎤🎵 [NATIVE]</span>
+            <span>🎤🎵 Recording (MIC + MUSIC) [NATIVE]</span>
         `;
         
         recordingInterval = setInterval(updateRecordingTimer, 1000);
@@ -1856,22 +1919,14 @@ async function startNativeAndroidRecording() {
         
     } catch (error) {
         console.error('❌ Native recording error:', error);
-        
-        if (error.message?.includes('Permission denied')) {
-            alert('Permission denied. Please allow screen recording to capture internal audio.');
-        } else {
-            alert('Native recording failed: ' + error.message);
-        }
-        
-        // Fallback to web recording
-        console.log('⚠️ Falling back to web recording...');
+        alert('Native recording failed: ' + error.message + '\n\nFalling back to web recording...');
         nativeRecordingActive = false;
-        await startRecording();
+        await startWebRecording();
     }
 }
 
 // ==========================================
-// NEW: UPDATE UI HELPER
+// UPDATE UI HELPER
 // ==========================================
 function updateRecordingUI(mode) {
     startRecordBtn.style.display = 'none';
@@ -1903,7 +1958,7 @@ function updateRecordingTimer() {
 }
 
 // ==========================================
-// UPDATED stopRecording - HANDLES NATIVE & WEB
+// STOP RECORDING - HANDLES NATIVE & WEB
 // ==========================================
 async function stopRecording() {
     console.log('⏹️ Stopping recording...');
@@ -1911,37 +1966,36 @@ async function stopRecording() {
     // NATIVE ANDROID
     if (nativeRecordingActive) {
         try {
-            const { InternalAudioCapture } = await import('capacitor-internal-audio-capture');
+            const InternalAudioCapture = window.Capacitor.Plugins.InternalAudioCapture;
+            
+            if (!InternalAudioCapture) {
+                throw new Error('Plugin not available');
+            }
             
             console.log('⏹️ Stopping native recording...');
             const result = await InternalAudioCapture.stopRecording();
             
-            console.log('✅ Native recording stopped');
-            console.log('📁 Audio file path:', result.path);
-            
-            // Convert file path to blob
-            const { Filesystem } = await import('@capacitor/filesystem');
-            const fileData = await Filesystem.readFile({
-                path: result.path
-            });
+            console.log('✅ Recording stopped successfully');
+            console.log('📁 File size:', (result.size / 1024).toFixed(2), 'KB');
             
             // Convert base64 to blob
-            const byteCharacters = atob(fileData.data);
+            const base64Data = result.base64;
+            const byteCharacters = atob(base64Data);
             const byteNumbers = new Array(byteCharacters.length);
             for (let i = 0; i < byteCharacters.length; i++) {
                 byteNumbers[i] = byteCharacters.charCodeAt(i);
             }
             const byteArray = new Uint8Array(byteNumbers);
-            recordedBlob = new Blob([byteArray], { type: 'audio/webm' });
+            recordedBlob = new Blob([byteArray], { type: 'audio/wav' });
             
             nativeRecordingActive = false;
             
-            // Show preview
+            // Show audio preview
             const audioUrl = URL.createObjectURL(recordedBlob);
             recordedAudio.src = audioUrl;
             recordedAudioPreview.style.display = 'block';
             
-            console.log('✅ Native recording processed!', (recordedBlob.size / 1024).toFixed(2), 'KB');
+            console.log('✅ Recording ready:', (recordedBlob.size / 1024).toFixed(2), 'KB');
             
         } catch (error) {
             console.error('❌ Error stopping native recording:', error);
@@ -1973,6 +2027,58 @@ async function stopRecording() {
     recordingIndicator.style.display = 'none';
     
     console.log('✅ Recording stopped');
+}
+
+// ==========================================
+// WEB FALLBACK RECORDING
+// ==========================================
+async function startWebRecording() {
+    try {
+        console.log('🌐 Starting web microphone recording...');
+        
+        micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: true,
+                sampleRate: 48000
+            }
+        });
+
+        mediaRecorder = new MediaRecorder(micStream, {
+            mimeType: 'audio/webm;codecs=opus',
+            audioBitsPerSecond: 128000
+        });
+
+        audioChunks = [];
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) audioChunks.push(e.data);
+        };
+        mediaRecorder.onstop = handleRecordingStop;
+        mediaRecorder.start(1000);
+        recordingStartTime = Date.now();
+
+        if (youtubePlayer?.playVideo) {
+            youtubePlayer.playVideo();
+        }
+
+        startRecordBtn.style.display = 'none';
+        stopRecordBtn.style.display = 'inline-flex';
+        recordingIndicator.style.display = 'flex';
+        recordingIndicator.innerHTML = `
+            <span class="recording-pulse"></span>
+            <span>🎤 Recording (MIC ONLY) [WEB]</span>
+        `;
+        
+        recordingInterval = setInterval(updateRecordingTimer, 1000);
+        
+        console.log('✅ Web recording started');
+        
+    } catch (error) {
+        console.error('❌ Web recording error:', error);
+        alert('Recording failed: ' + error.message);
+        cleanupStreams();
+    }
 }
 
 function handleRecordingStop() {
@@ -2107,8 +2213,168 @@ async function sendKaraokeRecording() {
     }
 }
 
-// Make functions globally accessible
-window.addFriend = addFriend;
-window.insertEmoji = insertEmoji;
-window.openImageModal = openImageModal;
-window.selectYouTubeVideo = selectYouTubeVideo;
+// ==========================================
+// ADD THESE LOGOUT FUNCTIONS TO app.js
+// Add after setupKaraokeModal() function
+// ==========================================
+
+function setupLogoutButton() {
+    const logoutBtn = document.getElementById('logoutBtn');
+    
+    if (!logoutBtn) {
+        console.error('❌ Logout button not found');
+        return;
+    }
+    
+    logoutBtn.addEventListener('click', showLogoutConfirmation);
+    
+    console.log('✅ Logout button setup complete');
+}
+
+function showLogoutConfirmation() {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('logoutModal');
+    
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'logoutModal';
+        modal.className = 'logout-modal';
+        modal.innerHTML = `
+            <div class="logout-modal-content">
+                <div class="logout-modal-header">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    <h3>Logout</h3>
+                </div>
+                <div class="logout-modal-body">
+                    <p>Are you sure you want to logout? You can always login again with your User ID and password.</p>
+                </div>
+                <div class="logout-modal-actions">
+                    <button class="logout-cancel-btn" onclick="hideLogoutConfirmation()">Cancel</button>
+                    <button class="logout-confirm-btn" onclick="performLogout()">Logout</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Close on backdrop click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                hideLogoutConfirmation();
+            }
+        });
+    }
+    
+    modal.classList.add('active');
+}
+
+function hideLogoutConfirmation() {
+    const modal = document.getElementById('logoutModal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+
+async function performLogout() {
+    const confirmBtn = document.querySelector('.logout-confirm-btn');
+    
+    if (!confirmBtn) return;
+    
+    // Disable button
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = `
+        <svg class="icon animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; display: inline-block; margin-right: 0.5rem;">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+        </svg>
+        Logging out...
+    `;
+    
+    try {
+        // Notify server with timeout
+        if (currentUser && currentUser.id) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+                
+                await fetch(`${API_URL}/auth/logout`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: currentUser.id }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                console.log('✅ Server notified of logout');
+                
+            } catch (error) {
+                console.warn('⚠️ Server logout notification failed (continuing anyway):', error.message);
+                // Continue with logout even if server notification fails
+            }
+        }
+        
+        // Disconnect socket
+        if (socket && socket.connected) {
+            socket.disconnect();
+            console.log('🔌 Socket disconnected');
+        }
+        
+        // Clear local storage
+        localStorage.removeItem('chatty_mirror_user');
+        console.log('✅ User data cleared from localStorage');
+        
+        // Show success message briefly
+        confirmBtn.innerHTML = '✅ Logged out!';
+        
+        // Redirect to auth page after short delay
+        setTimeout(() => {
+            window.location.href = 'auth.html';
+        }, 500);
+        
+    } catch (error) {
+        console.error('❌ Logout error:', error);
+        
+        // Force logout anyway - always clear data and redirect
+        localStorage.removeItem('chatty_mirror_user');
+        console.log('🔄 Forcing logout despite error');
+        
+        setTimeout(() => {
+            window.location.href = 'auth.html';
+        }, 500);
+    }
+}
+// ==========================================
+// UPDATE THE setupEventListeners() FUNCTION
+// Add this line inside setupEventListeners()
+// ==========================================
+
+// Add this line in your existing setupEventListeners() function:
+// setupLogoutButton();
+
+// ==========================================
+// UPDATE DOMContentLoaded EVENT
+// Modify the existing DOMContentLoaded to include:
+// ==========================================
+
+// Your existing code should look like this:
+/*
+document.addEventListener('DOMContentLoaded', async () => {
+    loadYouTubeAPI();
+    await initializeApp();
+    setupEventListeners();
+    initializeEmojiPicker();
+    initializeSocket();
+    setupMobileMenu();
+    setupSettingsModal();
+    setupImageModal();
+    setupKaraokeModal();
+    setupLogoutButton(); // ADD THIS LINE
+});
+*/
+
+// Make logout functions globally accessible
+window.showLogoutConfirmation = showLogoutConfirmation;
+window.hideLogoutConfirmation = hideLogoutConfirmation;
+window.performLogout = performLogout;
