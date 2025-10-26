@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Studio Pro</title>
+    <link rel="stylesheet" href="studio.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎙️ Voice Studio Pro</h1>
+            <p>Professional Voice Recording & Mixing</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Left Panel - Controls -->
+            <div class="left-panel">
+                <section class="control-section">
+                    <h3>Recording</h3>
+                    
+                    <!-- Effects Toggle for Recording -->
+                    <div class="effects-toggle-container" style="margin: 15px 0; padding: 15px; background: rgba(78, 205, 196, 0.1); border-radius: 8px; border: 1px solid rgba(78, 205, 196, 0.3);">
+                        <label style="display: flex; align-items: center; gap: 12px; cursor: pointer; user-select: none;">
+                            <div style="position: relative; width: 50px; height: 26px;">
+                                <input type="checkbox" id="effectsToggle" style="opacity: 0; width: 0; height: 0; position: absolute;">
+                                <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #555; transition: 0.3s; border-radius: 26px;"></span>
+                                <span style="position: absolute; content: ''; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: 0.3s; border-radius: 50%;"></span>
+                            </div>
+                            <span style="font-size: 14px; color: #b0b0b0; font-weight: 500;">Apply Effects on Recording</span>
+                        </label>
+                        <div id="effectsStatus" style="font-size: 12px; margin-top: 8px; color: #ff6b6b; font-weight: 500;">
+                            🔴 Recording clean/raw voice (no effects)
+                        </div>
+                    </div>
+                    
+                    <div class="record-controls">
+                        <button id="recordBtn" class="btn btn-record">
+                            <span class="icon">⏺</span> Record
+                        </button>
+                        <button id="stopBtn" class="btn btn-stop" disabled>
+                            <span class="icon">⏹</span> Stop
+                        </button>
+                        <button id="playBtn" class="btn btn-play" disabled>
+                            <span class="icon">▶</span> Play
+                        </button>
+                        <button id="pauseBtn" class="btn btn-pause" disabled>
+                            <span class="icon">⏸</span> Pause
+                        </button>
+                    </div>
+                    <div class="time-display">
+                        <span id="currentTime">00:00</span> / <span id="duration">00:00</span>
+                    </div>
+                </section>
+
+                <section class="control-section">
+                    <h3>Import Instrumental</h3>
+                    <input type="file" id="instrumentalInput" accept="audio/*" class="file-input">
+                    <label for="instrumentalInput" class="btn btn-import">
+                        <span class="icon">📁</span> Load Instrumental
+                    </label>
+                    <div id="instrumentalInfo" class="file-info"></div>
+                    <div class="volume-control">
+                        <label>Instrumental Volume</label>
+                        <input type="range" id="instVolume" min="0" max="100" value="70" class="slider">
+                        <span id="instVolumeValue">70%</span>
+                    </div>
+                </section>
+
+                <section class="control-section">
+                    <h3>Export</h3>
+                    <button id="exportBtn" class="btn btn-export" disabled>
+                        <span class="icon">💾</span> Export Mixed Audio
+                    </button>
+                </section>
+            </div>
+
+            <!-- Center Panel - Waveform & Meters -->
+            <div class="center-panel">
+                <div class="waveform-container">
+                    <h3>Waveform</h3>
+                    <canvas id="waveform" width="800" height="200"></canvas>
+                </div>
+                
+                <!-- NEW: Audio Track Import Section -->
+                <div class="audio-import-section">
+                    <h3>Import Audio Track</h3>
+                    <input type="file" id="audioTrackInput" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac" class="file-input">
+                    <label for="audioTrackInput" class="btn btn-import">
+                        <span class="icon">🎵</span> Load Audio Track
+                    </label>
+                    <div id="audioTrackInfo" class="file-info"></div>
+                    <div id="audioTrackWaveform" class="audio-track-waveform"></div>
+                </div>
+                
+                <div class="meters">
+                    <div class="meter-container">
+                        <label>Voice Level</label>
+                        <div class="meter">
+                            <div id="voiceMeter" class="meter-fill"></div>
+                        </div>
+                    </div>
+                    <div class="meter-container">
+                        <label>Master Level</label>
+                        <div class="meter">
+                            <div id="masterMeter" class="meter-fill"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel - Effects -->
+            <div class="right-panel effects-panel">
+                <section class="effect-section">
+                    <h3>🎚️ Equalizer</h3>
+                    <div class="eq-controls">
+                        <div class="eq-band">
+                            <label>Low (100Hz)</label>
+                            <input type="range" id="eqLow" min="-12" max="12" value="0" step="0.1" class="slider vertical">
+                            <span id="eqLowValue">0 dB</span>
+                        </div>
+                        <div class="eq-band">
+                            <label>Mid (1kHz)</label>
+                            <input type="range" id="eqMid" min="-12" max="12" value="0" step="0.1" class="slider vertical">
+                            <span id="eqMidValue">0 dB</span>
+                        </div>
+                        <div class="eq-band">
+                            <label>High (8kHz)</label>
+                            <input type="range" id="eqHigh" min="-12" max="12" value="0" step="0.1" class="slider vertical">
+                            <span id="eqHighValue">0 dB</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="effect-section">
+                    <h3>🎛️ Compressor</h3>
+                    <div class="param-control">
+                        <label>Threshold</label>
+                        <input type="range" id="compThreshold" min="-60" max="0" value="-24" class="slider">
+                        <span id="compThresholdValue">-24 dB</span>
+                    </div>
+                    <div class="param-control">
+                        <label>Ratio</label>
+                        <input type="range" id="compRatio" min="1" max="20" value="4" step="0.1" class="slider">
+                        <span id="compRatioValue">4:1</span>
+                    </div>
+                    <div class="param-control">
+                        <label>Attack</label>
+                        <input type="range" id="compAttack" min="0" max="1" value="0.003" step="0.001" class="slider">
+                        <span id="compAttackValue">3 ms</span>
+                    </div>
+                    <div class="param-control">
+                        <label>Release</label>
+                        <input type="range" id="compRelease" min="0" max="1" value="0.25" step="0.01" class="slider">
+                        <span id="compReleaseValue">250 ms</span>
+                    </div>
+                </section>
+
+                <section class="effect-section">
+                    <h3>🌊 Reverb</h3>
+                    <div class="param-control">
+                        <label>Decay</label>
+                        <input type="range" id="reverbDecay" min="0.1" max="10" value="1.5" step="0.1" class="slider">
+                        <span id="reverbDecayValue">1.5 s</span>
+                    </div>
+                    <div class="param-control">
+                        <label>Wet/Dry</label>
+                        <input type="range" id="reverbWet" min="0" max="100" value="20" class="slider">
+                        <span id="reverbWetValue">20%</span>
+                    </div>
+                </section>
+
+                <section class="effect-section">
+                    <h3>🔊 Echo</h3>
+                    <div class="param-control">
+                        <label>Delay Time</label>
+                        <input type="range" id="echoDelay" min="0" max="1000" value="250" class="slider">
+                        <span id="echoDelayValue">250 ms</span>
+                    </div>
+                    <div class="param-control">
+                        <label>Feedback</label>
+                        <input type="range" id="echoFeedback" min="0" max="90" value="30" class="slider">
+                        <span id="echoFeedbackValue">30%</span>
+                    </div>
+                    <div class="param-control">
+                        <label>Wet/Dry</label>
+                        <input type="range" id="echoWet" min="0" max="100" value="25" class="slider">
+                        <span id="echoWetValue">25%</span>
+                    </div>
+                </section>
+
+                <!-- UPDATED: Enhanced Auto-Tune Section -->
+                <section class="effect-section autotune-section">
+                    <h3>🎵 Auto-Tune</h3>
+                    <div class="param-control">
+                        <label>Detected Pitch: <span id="detectedPitch">--</span></label>
+                        <button id="detectPitchBtn" class="btn btn-small">Detect Pitch</button>
+                    </div>
+                    <div class="param-control autotune-intensity" data-intensity="0%">
+                        <label>Autotune Intensity</label>
+                        <input type="range" id="autotuneIntensity" min="0" max="100" value="0" class="slider">
+                        <div class="intensity-indicator">
+                            <span id="subtle">Subtle</span>
+                            <span id="moderate">Moderate</span>
+                            <span id="intense">Intense</span>
+                            <span id="extreme">Extreme</span>
+                        </div>
+                    </div>
+                    <div class="param-control">
+                        <label>Pitch Shift (Fine Tune)</label>
+                        <input type="range" id="pitchShift" min="-12" max="12" value="0" step="0.1" class="slider">
+                        <span id="pitchShiftValue">0 semitones</span>
+                    </div>
+                    <div class="param-control">
+                        <label>Formant Preservation</label>
+                        <input type="range" id="formantPreserve" min="0" max="100" value="50" class="slider">
+                        <span id="formantPreserveValue">50%</span>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="studio.js"></script>
+    
+    <style>
+        /* Toggle Switch Styles */
+        #effectsToggle:checked + span {
+            background-color: #4ecdc4 !important;
+        }
+        
+        #effectsToggle:checked + span + span {
+            transform: translateX(24px);
+        }
+        
+        .effects-panel {
+            transition: opacity 0.3s ease;
+        }
+    </style>
+</body>
+</html>

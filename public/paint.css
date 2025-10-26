@@ -1,0 +1,452 @@
+/* ==========================================
+   PAINT MODAL STYLES - LUXURY EDITION
+   ========================================== */
+
+.paint-modal {
+    z-index: 2000;
+}
+
+.paint-modal-content {
+    max-width: 95vw;
+    width: 1400px;
+    max-height: 95vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.paint-open-btn {
+    width: 100%;
+    padding: 1.5rem 2rem;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 16px;
+    font-weight: 700;
+    font-size: 1.125rem;
+    letter-spacing: 1px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 
+        0 10px 30px rgba(15, 52, 96, 0.3),
+        0 0 0 1px rgba(255, 215, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+    text-transform: uppercase;
+}
+
+.paint-open-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 215, 0, 0.2),
+        transparent
+    );
+    transition: left 0.6s ease;
+}
+
+.paint-open-btn:hover::before {
+    left: 100%;
+}
+
+.paint-open-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    padding: 2px;
+    background: linear-gradient(135deg, #ffd700, #ffed4e, #ffd700);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+.paint-open-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 
+        0 15px 40px rgba(15, 52, 96, 0.4),
+        0 0 0 1px rgba(255, 215, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+        0 0 30px rgba(255, 215, 0, 0.2);
+}
+
+.paint-open-btn:hover::after {
+    opacity: 1;
+}
+
+.paint-open-btn:active {
+    transform: translateY(-1px);
+}
+
+.paint-open-btn svg {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.paint-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 2px solid #e5e7eb;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.paint-header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.paint-header-left h2 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.paint-close-btn {
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.paint-close-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.paint-close-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+.paint-header-right {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.paint-action-btn {
+    padding: 0.625rem 1.25rem;
+    background: white;
+    color: #667eea;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+}
+
+.paint-action-btn:hover {
+    background: #f3f4f6;
+    transform: scale(1.05);
+}
+
+.paint-action-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.paint-toolbar {
+    display: flex;
+    gap: 2rem;
+    padding: 1rem 1.5rem;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    overflow-x: auto;
+    flex-wrap: wrap;
+}
+
+.paint-toolbar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.paint-toolbar-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.paint-tools {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.paint-tool-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0.5rem;
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.paint-tool-btn:hover {
+    border-color: #667eea;
+    background: #f0f4ff;
+}
+
+.paint-tool-btn.active {
+    border-color: #667eea;
+    background: #667eea;
+    color: white;
+}
+
+.paint-tool-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+.paint-slider {
+    width: 150px;
+    height: 6px;
+    background: #e5e7eb;
+    border-radius: 3px;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.paint-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #667eea;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.paint-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: #667eea;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+.paint-color-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.paint-color-input {
+    width: 50px;
+    height: 40px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.paint-color-presets {
+    display: flex;
+    gap: 0.375rem;
+    flex-wrap: wrap;
+}
+
+.paint-color-preset {
+    width: 32px;
+    height: 32px;
+    border: 2px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.paint-color-preset:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.paint-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.paint-action-small-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0.5rem;
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.paint-action-small-btn:hover {
+    border-color: #667eea;
+    background: #f0f4ff;
+}
+
+.paint-action-small-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+.paint-canvas-container {
+    flex: 1;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+    position: relative;
+    min-height: 400px;
+}
+
+.paint-canvas {
+    border: 1px solid #d1d5db;
+    cursor: crosshair;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    background: white;
+}
+
+.paint-pages {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+}
+
+.paint-page-btn {
+    padding: 0.5rem 1rem;
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.paint-page-btn:hover {
+    border-color: #667eea;
+    background: #f0f4ff;
+}
+
+.paint-page-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.paint-page-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.delete-page-btn {
+    color: #ef4444;
+}
+
+.delete-page-btn:hover {
+    border-color: #ef4444;
+    background: #fef2f2;
+}
+
+.paint-page-info {
+    font-weight: 600;
+    color: #374151;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .paint-modal-content {
+        width: 95vw;
+    }
+    
+    .paint-toolbar {
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .paint-header {
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: flex-start;
+    }
+    
+    .paint-header-right {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    
+    .paint-toolbar {
+        padding: 0.75rem;
+    }
+    
+    .paint-toolbar-section {
+        width: 100%;
+    }
+    
+    .paint-slider {
+        width: 100%;
+    }
+    
+    .paint-canvas {
+        max-width: 100%;
+    }
+    
+    .paint-pages {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    .paint-open-btn {
+        padding: 1.25rem 1.5rem;
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .paint-action-btn span,
+    .paint-page-btn span {
+        display: none;
+    }
+    
+    .paint-tools {
+        justify-content: center;
+    }
+    
+    .paint-color-presets {
+        justify-content: center;
+    }
+}

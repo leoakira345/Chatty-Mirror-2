@@ -1,0 +1,853 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #fff;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+
+header h1 {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+    background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+header p {
+    color: #aaa;
+    font-size: 1.1em;
+}
+
+.main-content {
+    display: grid;
+    grid-template-columns: 300px 1fr 350px;
+    gap: 20px;
+    align-items: start;
+}
+
+/* Panels */
+.left-panel, .center-panel, .right-panel {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 20px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.right-panel {
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.right-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.right-panel::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+}
+
+.right-panel::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+}
+
+.control-section, .effect-section {
+    margin-bottom: 25px;
+    padding-bottom: 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.control-section:last-child, .effect-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+h3 {
+    margin-bottom: 15px;
+    color: #4ecdc4;
+    font-size: 1.2em;
+}
+
+/* Buttons */
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-record {
+    background: linear-gradient(45deg, #ff6b6b, #ee5a6f);
+    color: white;
+}
+
+.btn-record:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+}
+
+.btn-stop {
+    background: linear-gradient(45deg, #95a5a6, #7f8c8d);
+    color: white;
+}
+
+.btn-play {
+    background: linear-gradient(45deg, #2ecc71, #27ae60);
+    color: white;
+}
+
+.btn-pause {
+    background: linear-gradient(45deg, #f39c12, #e67e22);
+    color: white;
+}
+
+.btn-import {
+    background: linear-gradient(45deg, #3498db, #2980b9);
+    color: white;
+}
+
+.btn-export {
+    background: linear-gradient(45deg, #9b59b6, #8e44ad);
+    color: white;
+}
+
+.btn-small {
+    padding: 8px 16px;
+    font-size: 0.9em;
+}
+
+.btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.icon {
+    font-size: 1.2em;
+}
+
+/* File Input */
+.file-input {
+    display: none;
+}
+
+.file-info {
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 5px;
+    font-size: 0.9em;
+    min-height: 20px;
+}
+
+/* Time Display */
+.time-display {
+    text-align: center;
+    font-size: 1.2em;
+    font-weight: 600;
+    color: #4ecdc4;
+    margin-top: 15px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+/* Sliders */
+.slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+    -webkit-appearance: none;
+    margin: 10px 0;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(45deg, #4ecdc4, #44a8a0);
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(45deg, #4ecdc4, #44a8a0);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+/* Volume Control */
+.volume-control {
+    margin-top: 15px;
+}
+
+.volume-control label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 0.9em;
+    color: #aaa;
+}
+
+/* Waveform */
+.waveform-container {
+    margin-bottom: 20px;
+}
+
+#waveform {
+    width: 100%;
+    height: 200px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    display: block;
+}
+
+/* Meters */
+.meters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.meter-container {
+    text-align: center;
+}
+
+.meter-container label {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 0.9em;
+    color: #aaa;
+}
+
+.meter {
+    width: 100%;
+    height: 30px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 15px;
+    overflow: hidden;
+    position: relative;
+}
+
+.meter-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #2ecc71, #f39c12, #e74c3c);
+    transition: width 0.1s ease;
+    border-radius: 15px;
+}
+
+/* EQ Controls */
+.eq-controls {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+}
+
+.eq-band {
+    text-align: center;
+}
+
+.eq-band label {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 0.85em;
+    color: #aaa;
+}
+
+.eq-band span {
+    display: block;
+    margin-top: 10px;
+    font-size: 0.9em;
+    color: #4ecdc4;
+    font-weight: 600;
+}
+
+/* Parameter Controls */
+.param-control {
+    margin-bottom: 15px;
+}
+
+.param-control label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 0.9em;
+    color: #aaa;
+}
+
+.param-control span {
+    display: inline-block;
+    margin-left: 10px;
+    color: #4ecdc4;
+    font-weight: 600;
+    font-size: 0.9em;
+}
+
+/* Recording Controls */
+.record-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+/* Responsive */
+@media (max-width: 1400px) {
+    .main-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .right-panel {
+        max-height: none;
+    }
+}
+
+@media (max-width: 768px) {
+    header h1 {
+        font-size: 1.8em;
+    }
+    
+    .eq-controls {
+        grid-template-columns: 1fr;
+    }
+    
+    .meters {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Pitch Detection */
+#detectedPitch {
+    color: #4ecdc4;
+    font-weight: 600;
+    font-size: 1.1em;
+}
+
+/* Recording Indicator */
+.recording {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+
+/* Audio Import Section */
+.audio-import-section {
+    margin: 20px 0;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.audio-track-waveform {
+    width: 100%;
+    height: 80px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    margin-top: 10px;
+    position: relative;
+    overflow: hidden;
+}
+
+.audio-track-waveform canvas {
+    width: 100%;
+    height: 100%;
+}
+
+/* Enhanced Autotune Section */
+.autotune-section {
+    background: rgba(78, 205, 196, 0.1);
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid rgba(78, 205, 196, 0.3);
+}
+
+.autotune-intensity {
+    position: relative;
+}
+
+.autotune-intensity::after {
+    content: attr(data-intensity);
+    position: absolute;
+    right: 0;
+    top: -5px;
+    font-size: 1.2em;
+    font-weight: 700;
+    color: #4ecdc4;
+}
+
+/* Autotune intensity indicator */
+.intensity-indicator {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 5px;
+    font-size: 0.8em;
+    color: #666;
+}
+
+.intensity-indicator span.active {
+    color: #4ecdc4;
+    font-weight: 600;
+}
+
+/* ========================================
+   RESPONSIVE DESIGN ENHANCEMENTS
+   Add these styles to your styles.css file
+   ======================================== */
+
+/* Base adjustments for better mobile handling */
+html {
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+}
+
+body {
+    overflow-x: hidden;
+    padding: 10px;
+}
+
+.container {
+    max-width: 100%;
+    padding: 0;
+}
+
+/* ========================================
+   TABLET VIEW (768px - 1400px)
+   ======================================== */
+@media (max-width: 1400px) {
+    .main-content {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .right-panel {
+        max-height: none;
+    }
+    
+    /* Make effects panel show in two columns on tablets */
+    .right-panel {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+    
+    .effect-section {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+    }
+}
+
+/* ========================================
+   MOBILE VIEW (Below 768px)
+   ======================================== */
+@media (max-width: 768px) {
+    body {
+        padding: 5px;
+    }
+    
+    /* Header adjustments */
+    header {
+        padding: 15px 10px;
+        margin-bottom: 15px;
+    }
+    
+    header h1 {
+        font-size: 1.8em;
+        margin-bottom: 5px;
+    }
+    
+    header p {
+        font-size: 0.9em;
+    }
+    
+    /* Main content single column */
+    .main-content {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    /* All panels full width */
+    .left-panel, 
+    .center-panel, 
+    .right-panel {
+        padding: 15px;
+        width: 100%;
+    }
+    
+    /* Effects panel back to single column */
+    .right-panel {
+        display: block;
+        max-height: none;
+    }
+    
+    .effect-section {
+        margin-bottom: 20px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .effect-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+    
+    /* Button adjustments */
+    .record-controls {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .btn {
+        padding: 14px 20px;
+        font-size: 0.95em;
+        margin-bottom: 8px;
+    }
+    
+    .btn-small {
+        padding: 10px 16px;
+        font-size: 0.85em;
+    }
+    
+    .icon {
+        font-size: 1.1em;
+    }
+    
+    /* EQ controls stack vertically */
+    .eq-controls {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    /* Meters stack vertically */
+    .meters {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    /* Waveform adjustments */
+    #waveform {
+        height: 150px;
+    }
+    
+    .audio-track-waveform {
+        height: 60px;
+    }
+    
+    /* Time display */
+    .time-display {
+        font-size: 1.1em;
+        padding: 8px;
+    }
+    
+    /* Effects toggle container */
+    .effects-toggle-container {
+        padding: 12px !important;
+        margin: 12px 0 !important;
+    }
+    
+    .effects-toggle-container label {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 10px !important;
+    }
+    
+    .effects-toggle-container span:last-child {
+        font-size: 13px !important;
+    }
+    
+    #effectsStatus {
+        font-size: 11px !important;
+        margin-top: 6px !important;
+    }
+    
+    /* Parameter controls */
+    .param-control {
+        margin-bottom: 12px;
+    }
+    
+    .param-control label {
+        font-size: 0.85em;
+    }
+    
+    .param-control span {
+        font-size: 0.85em;
+    }
+    
+    /* Slider adjustments for touch */
+    .slider {
+        height: 8px;
+        margin: 12px 0;
+    }
+    
+    .slider::-webkit-slider-thumb {
+        width: 22px;
+        height: 22px;
+    }
+    
+    .slider::-moz-range-thumb {
+        width: 22px;
+        height: 22px;
+    }
+    
+    /* Volume control */
+    .volume-control {
+        margin-top: 12px;
+    }
+    
+    /* File info */
+    .file-info {
+        font-size: 0.85em;
+        padding: 8px;
+    }
+    
+    /* Autotune section */
+    .autotune-section {
+        padding: 12px;
+    }
+    
+    .autotune-intensity::after {
+        font-size: 1em;
+        top: -3px;
+    }
+    
+    .intensity-indicator {
+        flex-wrap: wrap;
+        gap: 5px;
+        font-size: 0.75em;
+    }
+    
+    #detectedPitch {
+        font-size: 1em;
+    }
+}
+
+/* ========================================
+   SMALL MOBILE VIEW (Below 480px)
+   ======================================== */
+@media (max-width: 480px) {
+    header h1 {
+        font-size: 1.5em;
+    }
+    
+    header p {
+        font-size: 0.85em;
+    }
+    
+    .left-panel, 
+    .center-panel, 
+    .right-panel {
+        padding: 12px;
+    }
+    
+    h3 {
+        font-size: 1.1em;
+        margin-bottom: 12px;
+    }
+    
+    .btn {
+        padding: 12px 16px;
+        font-size: 0.9em;
+    }
+    
+    .time-display {
+        font-size: 1em;
+    }
+    
+    #waveform {
+        height: 120px;
+    }
+    
+    .audio-track-waveform {
+        height: 50px;
+    }
+    
+    .intensity-indicator span {
+        font-size: 0.7em;
+    }
+    
+    /* Make toggle switch slightly smaller */
+    .effects-toggle-container label > div:first-child {
+        width: 45px !important;
+        height: 24px !important;
+    }
+    
+    .effects-toggle-container label > div:first-child span:last-child {
+        height: 18px !important;
+        width: 18px !important;
+    }
+    
+    #effectsToggle:checked + span + span {
+        transform: translateX(21px) !important;
+    }
+}
+
+/* ========================================
+   LANDSCAPE MOBILE (Height < 500px)
+   ======================================== */
+@media (max-height: 500px) and (orientation: landscape) {
+    header {
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+    
+    header h1 {
+        font-size: 1.3em;
+        margin-bottom: 3px;
+    }
+    
+    header p {
+        font-size: 0.8em;
+    }
+    
+    .left-panel, 
+    .center-panel, 
+    .right-panel {
+        padding: 10px;
+    }
+    
+    #waveform {
+        height: 100px;
+    }
+    
+    .btn {
+        padding: 10px 14px;
+        font-size: 0.85em;
+    }
+    
+    h3 {
+        font-size: 1em;
+        margin-bottom: 10px;
+    }
+}
+
+/* ========================================
+   TOUCH DEVICE ENHANCEMENTS
+   ======================================== */
+@media (hover: none) and (pointer: coarse) {
+    /* Increase touch targets */
+    .btn {
+        min-height: 44px;
+    }
+    
+    .slider {
+        height: 10px;
+    }
+    
+    .slider::-webkit-slider-thumb {
+        width: 24px;
+        height: 24px;
+    }
+    
+    .slider::-moz-range-thumb {
+        width: 24px;
+        height: 24px;
+    }
+    
+    /* Prevent double-tap zoom */
+    button, 
+    input, 
+    label {
+        touch-action: manipulation;
+    }
+    
+    /* Better tap feedback */
+    .btn:active {
+        transform: scale(0.98);
+    }
+}
+
+/* ========================================
+   ACCESSIBILITY IMPROVEMENTS
+   ======================================== */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .btn {
+        border: 2px solid currentColor;
+    }
+    
+    .slider::-webkit-slider-thumb,
+    .slider::-moz-range-thumb {
+        border: 2px solid white;
+    }
+}
+
+/* ========================================
+   PRINT STYLES (Optional)
+   ======================================== */
+@media print {
+    body {
+        background: white;
+        color: black;
+    }
+    
+    .btn,
+    .file-input,
+    #waveform {
+        display: none;
+    }
+    
+    .main-content {
+        grid-template-columns: 1fr;
+    }
+}
