@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatty Mirror - Login</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💬</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .auth-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 420px;
+            overflow: hidden;
+            animation: slideUp 0.5s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .auth-header {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .auth-header h1 {
+            font-size: 1.75rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .auth-header p {
+            opacity: 0.9;
+            font-size: 0.9375rem;
+        }
+
+        .auth-body {
+            padding: 2rem;
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            background: #f3f4f6;
+            border-radius: 8px;
+            padding: 0.25rem;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 0.75rem;
+            background: none;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #6b7280;
+            transition: all 0.2s;
+        }
+
+        .auth-tab.active {
+            background: white;
+            color: #2563eb;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .auth-form {
+            display: none;
+        }
+
+        .auth-form.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 0.9375rem;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        .form-input:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .form-input.error {
+            border-color: #ef4444;
+        }
+
+        .error-message {
+            color: #ef4444;
+            font-size: 0.8125rem;
+            margin-top: 0.375rem;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .password-wrapper {
+            position: relative;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #6b7280;
+            padding: 0.25rem;
+        }
+
+        .toggle-password:hover {
+            color: #374151;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 0.875rem;
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 1rem;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .submit-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .alert {
+            padding: 0.875rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #10b981;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #ef4444;
+        }
+
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #3b82f6;
+        }
+
+        .user-id-display {
+            background: #f9fafb;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            text-align: center;
+        }
+
+        .user-id-display p {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 0.5rem;
+        }
+
+        .user-id-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #2563eb;
+            letter-spacing: 2px;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .info-text {
+            font-size: 0.8125rem;
+            color: #6b7280;
+            margin-top: 0.375rem;
+        }
+
+        @media (max-width: 480px) {
+            .auth-container {
+                max-width: 100%;
+            }
+
+            .auth-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .auth-body {
+                padding: 1.5rem;
+            }
+
+            .form-input {
+                font-size: 16px; /* Prevent zoom on iOS */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-header">
+            <h1>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 32px; height: 32px;">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                Chatty Mirror
+            </h1>
+            <p>Connect with friends instantly</p>
+        </div>
+
+        <div class="auth-body">
+            <!-- Alert Messages -->
+            <div id="alertBox" class="alert"></div>
+
+            <!-- Tabs -->
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">Login</button>
+                <button class="auth-tab" data-tab="signup">Sign Up</button>
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="auth-form active">
+                <div class="form-group">
+                    <label class="form-label">User ID or Name</label>
+                    <input type="text" id="loginIdentifier" class="form-input" placeholder="Enter your User ID or Name" required autocomplete="username">
+                    <span class="error-message" id="loginIdentifierError"></span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" required autocomplete="current-password">
+                        <button type="button" class="toggle-password" data-target="loginPassword">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                    <span class="error-message" id="loginPasswordError"></span>
+                </div>
+
+                <button type="submit" class="submit-btn" id="loginBtn">
+                    Login
+                </button>
+            </form>
+
+            <!-- Sign Up Form -->
+            <form id="signupForm" class="auth-form">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" id="signupName" class="form-input" placeholder="Enter your full name" required autocomplete="name">
+                    <span class="error-message" id="signupNameError"></span>
+                    <p class="info-text">This will be your display name (2-25 characters)</p>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" id="signupEmail" class="form-input" placeholder="Enter your email" required autocomplete="email">
+                    <span class="error-message" id="signupEmailError"></span>
+                    <p class="info-text">We'll never share your email with anyone</p>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Create Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="signupPassword" class="form-input" placeholder="Create a strong password" required autocomplete="new-password">
+                        <button type="button" class="toggle-password" data-target="signupPassword">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                    <span class="error-message" id="signupPasswordError"></span>
+                    <p class="info-text">At least 6 characters</p>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Confirm Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="signupConfirmPassword" class="form-input" placeholder="Re-enter your password" required autocomplete="new-password">
+                        <button type="button" class="toggle-password" data-target="signupConfirmPassword">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                    <span class="error-message" id="signupConfirmPasswordError"></span>
+                </div>
+
+                <button type="submit" class="submit-btn" id="signupBtn">
+                    Create Account
+                </button>
+
+                <!-- User ID Display (shown after successful signup) -->
+                <div id="userIdDisplay" class="user-id-display" style="display: none;">
+                    <p>🎉 Your unique User ID is:</p>
+                    <div class="user-id-value" id="generatedUserId">----</div>
+                    <p style="margin-top: 0.5rem;">Save this ID! You can use it to login.</p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Auto-detect environment
+const isDevelopment = window.location.hostname === 'localhost' || 
+                      window.location.hostname === '127.0.0.1';
+
+const API_URL = isDevelopment 
+    ? 'http://localhost:3000/api'
+    : 'https://chatty-mirror-2.onrender.com/api';
+
+console.log('🔧 Environment:', isDevelopment ? 'Development' : 'Production');
+console.log('🔧 API URL:', API_URL);
+        
+        // Tab switching
+        document.querySelectorAll('.auth-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetTab = tab.dataset.tab;
+                
+                // Update active tab
+                document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Update active form
+                document.querySelectorAll('.auth-form').forEach(form => form.classList.remove('active'));
+                document.getElementById(`${targetTab}Form`).classList.add('active');
+                
+                // Clear alerts
+                hideAlert();
+            });
+        });
+
+        // Password toggle
+        document.querySelectorAll('.toggle-password').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetId = btn.dataset.target;
+                const input = document.getElementById(targetId);
+                
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    btn.innerHTML = `
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                            <line x1="1" y1="1" x2="23" y2="23"></line>
+                        </svg>
+                    `;
+                } else {
+                    input.type = 'password';
+                    btn.innerHTML = `
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    `;
+                }
+            });
+        });
+
+        // Validation functions
+        function validateEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(email);
+        }
+
+        function showError(inputId, message) {
+            const input = document.getElementById(inputId);
+            const error = document.getElementById(`${inputId}Error`);
+            input.classList.add('error');
+            error.textContent = message;
+            error.classList.add('show');
+        }
+
+        function clearError(inputId) {
+            const input = document.getElementById(inputId);
+            const error = document.getElementById(`${inputId}Error`);
+            input.classList.remove('error');
+            error.classList.remove('show');
+        }
+
+        function showAlert(message, type = 'info') {
+            const alert = document.getElementById('alertBox');
+            alert.textContent = message;
+            alert.className = `alert alert-${type} show`;
+        }
+
+        function hideAlert() {
+            const alert = document.getElementById('alertBox');
+            alert.classList.remove('show');
+        }
+
+        // Login Form
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const identifier = document.getElementById('loginIdentifier').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const btn = document.getElementById('loginBtn');
+            
+            // Clear previous errors
+            clearError('loginIdentifier');
+            clearError('loginPassword');
+            hideAlert();
+            
+            // Validation
+            if (!identifier) {
+                showError('loginIdentifier', 'Please enter your User ID or Name');
+                return;
+            }
+            
+            if (!password) {
+                showError('loginPassword', 'Please enter your password');
+                return;
+            }
+            
+            // Disable button
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Logging in...';
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ identifier, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    localStorage.setItem('chatty_mirror_user', JSON.stringify(data.user));
+                    showAlert('Login successful! Redirecting...', 'success');
+                    
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 1000);
+                } else {
+                    showAlert(data.message || 'Invalid credentials', 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = 'Login';
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showAlert('Connection error. Please try again.', 'error');
+                btn.disabled = false;
+                btn.innerHTML = 'Login';
+            }
+        });
+
+        // Sign Up Form
+        document.getElementById('signupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const name = document.getElementById('signupName').value.trim();
+            const email = document.getElementById('signupEmail').value.trim();
+            const password = document.getElementById('signupPassword').value;
+            const confirmPassword = document.getElementById('signupConfirmPassword').value;
+            const btn = document.getElementById('signupBtn');
+            
+            // Clear previous errors
+            clearError('signupName');
+            clearError('signupEmail');
+            clearError('signupPassword');
+            clearError('signupConfirmPassword');
+            hideAlert();
+            
+            let hasError = false;
+            
+            // Validate name
+            if (!name || name.length < 2) {
+                showError('signupName', 'Name must be at least 2 characters');
+                hasError = true;
+            } else if (name.length > 25) {
+                showError('signupName', 'Name must be less than 25 characters');
+                hasError = true;
+            }
+            
+            // Validate email
+            if (!email) {
+                showError('signupEmail', 'Email is required');
+                hasError = true;
+            } else if (!validateEmail(email)) {
+                showError('signupEmail', 'Please enter a valid email address');
+                hasError = true;
+            }
+            
+            // Validate password
+            if (!password) {
+                showError('signupPassword', 'Password is required');
+                hasError = true;
+            } else if (password.length < 6) {
+                showError('signupPassword', 'Password must be at least 6 characters');
+                hasError = true;
+            }
+            
+            // Validate confirm password
+            if (!confirmPassword) {
+                showError('signupConfirmPassword', 'Please confirm your password');
+                hasError = true;
+            } else if (password !== confirmPassword) {
+                showError('signupConfirmPassword', 'Passwords do not match');
+                hasError = true;
+            }
+            
+            if (hasError) return;
+            
+            // Disable button
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Creating Account...';
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert('Account created successfully!', 'success');
+                    
+                    // Display user ID
+                    document.getElementById('generatedUserId').textContent = data.user.id;
+                    document.getElementById('userIdDisplay').style.display = 'block';
+                    
+                    // Reset form
+                    document.getElementById('signupForm').reset();
+                    
+                    // Auto-login after 3 seconds
+                    setTimeout(() => {
+                        localStorage.setItem('chatty_mirror_user', JSON.stringify(data.user));
+                        window.location.href = 'index.html';
+                    }, 3000);
+                } else {
+                    showAlert(data.message || 'Signup failed', 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = 'Create Account';
+                }
+            } catch (error) {
+                console.error('Signup error:', error);
+                showAlert('Connection error. Please try again.', 'error');
+                btn.disabled = false;
+                btn.innerHTML = 'Create Account';
+            }
+        });
+
+        // Real-time password match validation
+        document.getElementById('signupConfirmPassword').addEventListener('input', () => {
+            const password = document.getElementById('signupPassword').value;
+            const confirmPassword = document.getElementById('signupConfirmPassword').value;
+            
+            if (confirmPassword && password !== confirmPassword) {
+                showError('signupConfirmPassword', 'Passwords do not match');
+            } else {
+                clearError('signupConfirmPassword');
+            }
+       });
+    </script>
+</body>
+</html>
