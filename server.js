@@ -924,4 +924,240 @@ async function startServer() {
     });
 }
 
+// ==========================================
+// ADD THESE AUTHENTICATION ROUTES TO YOUR server.js
+// Place them after your existing routes, before startServer()
+// ==========================================
+
+// Simple password hashing function (for demonstration)
+// In production, use bcrypt or similar library
+function hashPassword(password) {
+    // This is a simple hash - in production use bcrypt!
+    let hash = 0;
+    for (let i = 0; i < password.length; i++) {
+        const char = password.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return Math.abs(hash).toString(36);
+}
+
+// Sign Up Route
+app.post('/api/auth/signup', async (req, res) => {
+    try {
+        const { name, email, password } = req.body;
+        
+        console.log('📝 Signup request:', { name, email });
+        
+        // Validation
+        if (!name || !email || !password) {
+            return res.json({ 
+                success: false, 
+                message: 'All fields are required' 
+            });
+        }
+        
+        if (name.length < 2 || name.length > 25) {
+            return res.json({ 
+                success: false, 
+                message: 'Name must be 2-25 characters' 
+            });
+        }
+        
+        // Simple email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.json({ 
+                success: false, 
+                message: 'Invalid email format' 
+            });
+        }
+        
+        if (password.length < 6) {
+            return res.json({ 
+                success: false, 
+                message: 'Password must be at least 6 characters' 
+            });
+        }
+        
+        // Check if email already exists
+        const files = await fs.readdir(DATA_DIR);
+        const userFiles = files.filter(f => f.startsWith('user_') && f.endsWith('.json'));
+        
+        for (const file of userFiles) {
+            const userData = await readJSON(file);
+            if (userData && userData.email && userData.email.toLowerCase() === email.toLowerCase()) {
+                return res.json({ 
+                    success: false, 
+                    message: 'Email already registered' 
+                });
+            }
+        }
+        
+        // Generate unique user ID
+        const userId = await generateUniqueUserId();
+        
+        // Create user object
+        const user = {
+            id: userId,
+            username: name,
+            email: email.toLowerCase(),
+            password: hashPassword(password), // Hash the password
+            profilePhoto: null,
+            createdAt: Date.now()
+        };
+        
+        // Save user
+        const saved = await writeJSON(`user_${userId}.json`, user);
+        
+        if (saved) {
+            console.log(`✅ New user registered: ${userId} (${name})`);
+            
+            // Return user without password
+            const { password: _, ...userWithoutPassword } = user;
+            
+            res.json({ 
+                success: true, 
+                user: userWithoutPassword,
+                message: 'Account created successfully' 
+            });
+        } else {
+            res.json({ 
+                success: false, 
+                message: 'Failed to create account' 
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Signup error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error during signup' 
+        });
+    }
+});
+
+// Login Route
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { identifier, password } = req.body;
+        
+        console.log('🔐 Login attempt:', identifier);
+        
+        if (!identifier || !password) {
+            return res.json({ 
+                success: false, 
+                message: 'All fields are required' 
+            });
+        }
+        
+        // Search for user by ID or username
+        const files = await fs.readdir(DATA_DIR);
+        const userFiles = files.filter(f => f.startsWith('user_') && f.endsWith('.json'));
+        
+        let foundUser = null;
+        
+        // Check if identifier is a 4-digit ID
+        if (/^\d{4}$/.test(identifier)) {
+            // Search by ID
+            const userData = await readJSON(`user_${identifier}.json`);
+            if (userData) {
+                foundUser = userData;
+            }
+        } else {
+            // Search by username
+            for (const file of userFiles) {
+                const userData = await readJSON(file);
+                if (userData && userData.username && userData.username.toLowerCase() === identifier.toLowerCase()) {
+                    foundUser = userData;
+                    break;
+                }
+            }
+        }
+        
+        if (!foundUser) {
+            return res.json({ 
+                success: false, 
+                message: 'Invalid credentials' 
+            });
+        }
+        
+        // Verify password
+        const hashedPassword = hashPassword(password);
+        if (foundUser.password !== hashedPassword) {
+            return res.json({ 
+                success: false, 
+                message: 'Invalid credentials' 
+            });
+        }
+        
+        console.log(`✅ User logged in: ${foundUser.id} (${foundUser.username})`);
+        
+        // Return user without password
+        const { password: _, ...userWithoutPassword } = foundUser;
+        
+        res.json({ 
+            success: true, 
+            user: userWithoutPassword,
+            message: 'Login successful' 
+        });
+        
+    } catch (error) {
+        console.error('❌ Login error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error during login' 
+        });
+    }
+});
+
+// Check if email exists (for validation)
+app.post('/api/auth/check-email', async (req, res) => {
+    try {
+        const { email } = req.body;
+        
+        if (!email) {
+            return res.json({ exists: false });
+        }
+        
+        const files = await fs.readdir(DATA_DIR);
+        const userFiles = files.filter(f => f.startsWith('user_') && f.endsWith('.json'));
+        
+        for (const file of userFiles) {
+            const userData = await readJSON(file);
+            if (userData && userData.email && userData.email.toLowerCase() === email.toLowerCase()) {
+                return res.json({ exists: true });
+            }
+        }
+        
+        res.json({ exists: false });
+        
+    } catch (error) {
+        console.error('❌ Check email error:', error);
+        res.json({ exists: false });
+    }
+});
+
+// Logout Route (optional - mainly client-side)
+app.post('/api/auth/logout', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        
+        if (userId && activeUsers.has(userId)) {
+            const socketId = activeUsers.get(userId);
+            activeUsers.delete(userId);
+            
+            // Notify others that user is offline
+            io.emit('user_status', { userId, status: 'offline' });
+            
+            console.log(`👋 User logged out: ${userId}`);
+        }
+        
+        res.json({ success: true, message: 'Logged out successfully' });
+        
+    } catch (error) {
+        console.error('❌ Logout error:', error);
+        res.json({ success: false, message: 'Logout failed' });
+    }
+});
 startServer();
