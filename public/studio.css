@@ -1038,6 +1038,25 @@ body {
     -webkit-appearance: slider-vertical;
 }
 
+/* Mobile Overlay */
+.mobile-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.mobile-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
     width: 8px;
@@ -1058,8 +1077,10 @@ body {
 }
 
 /* ===============================================
-   RESPONSIVE DESIGN
+   RESPONSIVE DESIGN - MOBILE FIRST (BandLab Style)
    =============================================== */
+
+/* Tablet View */
 @media (max-width: 1200px) {
     .left-sidebar,
     .right-sidebar {
@@ -1067,29 +1088,325 @@ body {
     }
 }
 
-@media (max-width: 900px) {
-    .studio-main {
-        flex-direction: column;
-    }
-    
+/* Mobile View - BandLab Style */
+@media (max-width: 768px) {
+    /* Hide desktop sidebars on mobile - slide in from sides */
     .left-sidebar,
     .right-sidebar {
-        width: 100%;
-        max-height: 280px;
+        position: fixed;
+        top: 0;
+        height: 100vh;
+        z-index: 1000;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        width: 80%;
+        max-width: 320px;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
     }
-}
-
-@media (max-width: 600px) {
+    
+    .left-sidebar.mobile-open {
+        transform: translateX(0);
+    }
+    
+    .right-sidebar {
+        left: auto;
+        right: 0;
+        transform: translateX(100%);
+        box-shadow: -2px 0 10px rgba(0, 0, 0, 0.5);
+    }
+    
+    .right-sidebar.mobile-open {
+        transform: translateX(0);
+    }
+    
+    /* Compact top nav for mobile */
     .top-nav {
-        padding: 0 10px;
+        padding: 0 8px;
+        height: 48px;
     }
     
     .project-info {
         display: none;
     }
     
+    .nav-center {
+        display: none;
+    }
+    
+    .menu-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 18px;
+    }
+    
+    .nav-btn {
+        padding: 4px 8px;
+        font-size: 12px;
+        height: 28px;
+    }
+    
+    .tempo-control,
+    .time-signature,
+    .key-btn {
+        display: none;
+    }
+    
+    /* Mobile transport controls - Bottom fixed (BandLab style) */
+    .transport-controls {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        padding: 12px 16px;
+        background: #111;
+        border-top: 1px solid #2a2a2a;
+        border-bottom: none;
+        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.4);
+        justify-content: space-around;
+    }
+    
     .transport-btn {
-        width: 36px;
-        height: 36px;
+        width: 48px;
+        height: 48px;
+        font-size: 20px;
+        border-radius: 8px;
+    }
+    
+    /* Large circular play button (BandLab style) */
+    .play-btn {
+        width: 64px;
+        height: 64px;
+        font-size: 28px;
+        border-radius: 50%;
+        box-shadow: 0 4px 12px rgba(78, 205, 196, 0.4);
+    }
+    
+    .record-btn {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+    }
+    
+    .time-display {
+        position: static;
+        background: transparent;
+        padding: 0;
+        font-size: 13px;
+        order: -1;
+    }
+    
+    /* Mobile workspace adjustments */
+    .studio-main {
+        padding-bottom: 100px; /* Space for bottom transport */
+    }
+    
+    .center-workspace {
+        width: 100%;
+    }
+    
+    /* Mobile timeline */
+    .timeline-header {
+        height: 32px;
+        padding: 0 4px;
+    }
+    
+    .timeline-track {
+        height: 100px;
+    }
+    
+    /* Mobile master meter - top right */
+    .master-meter-panel {
+        top: 52px;
+        bottom: auto;
+        right: 8px;
+        padding: 6px 10px;
+    }
+    
+    .meter-bar {
+        width: 100px;
+        height: 5px;
+    }
+    
+    .meter-label {
+        font-size: 9px;
+    }
+    
+    /* Mobile tracks list */
+    .tracks-list {
+        padding: 6px;
+    }
+    
+    .track-item {
+        padding: 8px;
+        margin-bottom: 4px;
+    }
+    
+    .track-header {
+        margin-bottom: 6px;
+    }
+    
+    .track-name {
+        font-size: 11px;
+    }
+    
+    .track-icon {
+        font-size: 14px;
+    }
+    
+    /* Mobile effects panel */
+    .effects-tabs {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .effects-tab {
+        padding: 8px;
+        font-size: 11px;
+    }
+    
+    .effects-content,
+    .mixer-content {
+        padding: 8px;
+    }
+    
+    .effect-group {
+        padding: 10px;
+        margin-bottom: 8px;
+    }
+    
+    .effect-title {
+        font-size: 11px;
+    }
+    
+    .param-control {
+        margin-bottom: 10px;
+    }
+    
+    .param-control label {
+        font-size: 10px;
+    }
+    
+    /* Mobile buttons */
+    .btn-primary,
+    .btn-secondary {
+        padding: 6px 12px;
+        font-size: 11px;
+        height: 28px;
+    }
+    
+    .icon-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 14px;
+    }
+    
+    /* Sidebar close button for mobile */
+    .sidebar-header {
+        padding: 10px 12px;
+    }
+}
+
+/* Small Mobile View (< 400px) */
+@media (max-width: 400px) {
+    .left-sidebar,
+    .right-sidebar {
+        width: 85%;
+        max-width: 280px;
+    }
+    
+    .transport-controls {
+        padding: 10px 12px;
+        gap: 6px;
+    }
+    
+    .transport-btn {
+        width: 44px;
+        height: 44px;
+        font-size: 18px;
+    }
+    
+    .play-btn {
+        width: 56px;
+        height: 56px;
+        font-size: 24px;
+    }
+    
+    .nav-left,
+    .nav-right {
+        gap: 4px;
+    }
+    
+    .btn-primary,
+    .btn-secondary {
+        padding: 4px 10px;
+        font-size: 11px;
+        height: 28px;
+    }
+    
+    .master-meter-panel {
+        padding: 4px 8px;
+    }
+    
+    .meter-bar {
+        width: 80px;
+    }
+    
+    .track-item {
+        padding: 6px;
+    }
+    
+    .track-controls {
+        gap: 4px;
+    }
+    
+    .track-control-btn {
+        width: 22px;
+        height: 22px;
+        font-size: 9px;
+    }
+    
+    .time-display {
+        font-size: 12px;
+    }
+    
+    .studio-main {
+        padding-bottom: 90px;
+    }
+}
+
+/* Landscape Mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+    .transport-controls {
+        padding: 8px 12px;
+    }
+    
+    .transport-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+    }
+    
+    .play-btn {
+        width: 52px;
+        height: 52px;
+        font-size: 22px;
+    }
+    
+    .studio-main {
+        padding-bottom: 70px;
+    }
+    
+    .timeline-track {
+        height: 80px;
+    }
+    
+    .top-nav {
+        height: 44px;
+    }
+    
+    .master-meter-panel {
+        top: 48px;
     }
 }
