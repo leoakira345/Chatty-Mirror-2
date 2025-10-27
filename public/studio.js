@@ -37,14 +37,14 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ===============================================
-// RECORDING FUNCTIONS
+// RECORDING FUNCTIONS - HIGH QUALITY + LOW LATENCY
 // ===============================================
 let recordingAudioContext = null;
 let recordingMicStream = null;
 let playbackSources = [];
 
 async function startRecording() {
-    console.log('Starting HIGH QUALITY recording...');
+    console.log('Starting HIGH QUALITY recording with LOW LATENCY...');
     
     if (!audioContext) {
         await initAudio();
@@ -55,39 +55,38 @@ async function startRecording() {
     }
     
     try {
-        // Request HIGH QUALITY microphone input
+        // Request MAXIMUM QUALITY microphone input
         recordingMicStream = await navigator.mediaDevices.getUserMedia({ 
             audio: {
-                echoCancellation: false, // Disable for better quality
-                noiseSuppression: false, // Disable for better quality
-                autoGainControl: false,
-                sampleRate: 48000,
-                sampleSize: 24, // Higher bit depth
-                channelCount: 2, // Stereo
+                echoCancellation: false, // OFF for maximum quality
+                noiseSuppression: false, // OFF for maximum quality
+                autoGainControl: false,  // OFF for maximum quality
+                sampleRate: 48000,       // High sample rate
+                sampleSize: 24,          // High bit depth
+                channelCount: 2,         // Stereo
                 latency: 0,
                 volume: 1.0
             } 
         });
         
-        console.log('✅ HIGH QUALITY Microphone access granted');
+        console.log('✅ MAXIMUM QUALITY Microphone access granted');
         
-        // Create high-quality recording context
+        // Create high-quality recording context with LOW LATENCY
         recordingAudioContext = new (window.AudioContext || window.webkitAudioContext)({ 
             sampleRate: 48000,
-            latencyHint: 'playback' // Better quality than 'interactive'
+            latencyHint: 'interactive' // LOW LATENCY for monitoring
         });
         
         const recordingDestination = recordingAudioContext.createMediaStreamDestination();
         
-        const monitorGain = recordingAudioContext.createGain();
-        monitorGain.gain.value = 1.0;
-        monitorGain.connect(recordingAudioContext.destination);
+        // NO MONITORING = ZERO DELAY!
+        // Use headphones or system monitoring for real-time feedback
         
         const micSource = recordingAudioContext.createMediaStreamSource(recordingMicStream);
         const micGain = recordingAudioContext.createGain();
-        micGain.gain.value = 1.8; // Boost microphone level
+        micGain.gain.value = 2.0; // Higher boost for better recording level
         
-        // Add a compressor for better dynamic range
+        // Add a compressor for better dynamic range (maintains quality)
         const micCompressor = recordingAudioContext.createDynamicsCompressor();
         micCompressor.threshold.value = -30;
         micCompressor.knee.value = 10;
@@ -95,16 +94,19 @@ async function startRecording() {
         micCompressor.attack.value = 0.003;
         micCompressor.release.value = 0.25;
         
+        // Direct connection to recording - ZERO LATENCY PATH
         micSource.connect(micGain);
         micGain.connect(micCompressor);
         micCompressor.connect(recordingDestination);
-        micCompressor.connect(monitorGain);
+        // NO MONITORING CONNECTION = NO DELAY!
         
         playbackSources = [];
         
         // Play ALL tracks (including imported/local files) during recording
+        // SEPARATE PLAYBACK PATH - You will hear backing tracks!
         tracks.forEach(track => {
             if (track.buffer && !track.muted) {
+                // For RECORDING (mixed with your voice)
                 const trackSource = recordingAudioContext.createBufferSource();
                 trackSource.buffer = track.buffer;
                 const trackGain = recordingAudioContext.createGain();
@@ -112,10 +114,23 @@ async function startRecording() {
                 
                 trackSource.connect(trackGain);
                 trackGain.connect(recordingDestination);
-                trackGain.connect(monitorGain);
+                // NO MONITORING = NO DELAY!
                 
                 trackSource.start(0);
                 playbackSources.push(trackSource);
+                
+                // For PLAYBACK (so you can hear it while recording)
+                const playbackSource = recordingAudioContext.createBufferSource();
+                playbackSource.buffer = track.buffer;
+                const playbackGain = recordingAudioContext.createGain();
+                playbackGain.gain.value = (track.volume / 100) * 0.8; // Slightly louder for monitoring
+                
+                playbackSource.connect(playbackGain);
+                playbackGain.connect(recordingAudioContext.destination); // THIS PLAYS IT!
+                
+                playbackSource.start(0);
+                playbackSources.push(playbackSource); // Store for cleanup
+                
                 console.log('Playing track during recording:', track.name, '(Type:', track.type + ')');
             }
         });
@@ -128,23 +143,23 @@ async function startRecording() {
         
         const mixedStream = recordingDestination.stream;
         
-        // Use highest quality codec available
+        // Use HIGHEST QUALITY codec available
         let mimeType = 'audio/webm;codecs=opus';
         let audioBitsPerSecond = 510000; // Very high bitrate (510kbps)
         
-        // Try different codecs for best quality
+        // Try different codecs for MAXIMUM quality
         if (MediaRecorder.isTypeSupported('audio/webm;codecs=pcm')) {
             mimeType = 'audio/webm;codecs=pcm'; // Lossless
             audioBitsPerSecond = 1536000; // Maximum quality
-            console.log('🎤 Using PCM codec (Lossless)');
+            console.log('🎤 Using PCM codec (Lossless) - MAXIMUM QUALITY');
         } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
             mimeType = 'audio/webm;codecs=opus';
             audioBitsPerSecond = 510000;
-            console.log('🎤 Using Opus codec (510kbps - Very High Quality)');
+            console.log('🎤 Using Opus codec (510kbps) - VERY HIGH QUALITY');
         } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
             mimeType = 'audio/ogg;codecs=opus';
             audioBitsPerSecond = 510000;
-            console.log('🎤 Using OGG Opus codec (510kbps)');
+            console.log('🎤 Using OGG Opus codec (510kbps) - HIGH QUALITY');
         } else {
             mimeType = 'audio/webm';
             audioBitsPerSecond = 510000;
@@ -207,7 +222,7 @@ async function startRecording() {
                 
                 addTrackToTimeline('Voice Recording ' + new Date().toLocaleTimeString(), decodedBuffer, 'recording');
                 
-                console.log('✅ HIGH QUALITY Recording processed successfully');
+                console.log('✅ HIGH QUALITY Recording processed successfully!');
                 
             } catch (err) {
                 console.error('Error processing recorded audio:', err);
@@ -232,7 +247,9 @@ async function startRecording() {
         
         updateTimer();
         
-        console.log('🎙️ HIGH QUALITY Recording started successfully');
+        console.log('🎙️ HIGH QUALITY Recording started - ZERO DELAY MODE!');
+        console.log('🎵 Backing tracks will play through your speakers/headphones!');
+        console.log('💡 TIP: Use headphones for best experience (prevents echo in recording).');
         
     } catch (err) {
         console.error('Error starting recording:', err);
@@ -263,7 +280,6 @@ function stopRecording() {
         console.log('Recording stopped');
     }
 }
-
 // ===============================================
 // PLAYBACK FUNCTIONS
 // ===============================================
