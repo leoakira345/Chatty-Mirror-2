@@ -1,3 +1,4 @@
+/* Reset & Base Styles */
 * {
     margin: 0;
     padding: 0;
@@ -5,849 +6,1090 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    color: #fff;
-    min-height: 100vh;
-    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: #000;
+    color: #e0e0e0;
+    overflow: hidden;
+    height: 100vh;
 }
 
-.container {
-    max-width: 1600px;
-    margin: 0 auto;
+/* ===============================================
+   LOADING SCREEN
+   =============================================== */
+.loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    transition: opacity 0.5s ease, visibility 0.5s ease;
 }
 
-header {
+.loading-screen.fade-out {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.loading-content {
     text-align: center;
-    margin-bottom: 30px;
-    padding: 20px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 15px;
-    backdrop-filter: blur(10px);
+    max-width: 500px;
+    width: 90%;
 }
 
-header h1 {
+.studio-logo {
+    margin-bottom: 50px;
+    animation: logoFadeIn 0.8s ease;
+}
+
+@keyframes logoFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.logo-icon {
+    font-size: 80px;
+    margin-bottom: 20px;
+    animation: iconPulse 2s ease-in-out infinite;
+}
+
+@keyframes iconPulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.studio-logo h1 {
     font-size: 2.5em;
-    margin-bottom: 10px;
-    background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+    font-weight: 700;
+    background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+    background-size: 200% 200%;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    animation: gradientShift 3s ease infinite;
 }
 
-header p {
-    color: #aaa;
-    font-size: 1.1em;
+@keyframes gradientShift {
+    0%, 100% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
 }
 
-.main-content {
-    display: grid;
-    grid-template-columns: 300px 1fr 350px;
-    gap: 20px;
-    align-items: start;
+.loading-bar-container {
+    margin-top: 40px;
 }
 
-/* Panels */
-.left-panel, .center-panel, .right-panel {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 15px;
-    padding: 20px;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.right-panel {
-    max-height: 90vh;
-    overflow-y: auto;
-}
-
-.right-panel::-webkit-scrollbar {
-    width: 8px;
-}
-
-.right-panel::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
+.loading-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
     border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 0 20px rgba(78, 205, 196, 0.2);
 }
 
-.right-panel::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+.loading-progress {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1);
+    background-size: 200% 100%;
     border-radius: 10px;
+    transition: width 0.3s ease;
+    animation: progressGlow 2s ease infinite;
+    box-shadow: 0 0 20px rgba(78, 205, 196, 0.5);
 }
 
-.control-section, .effect-section {
-    margin-bottom: 25px;
-    padding-bottom: 25px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+@keyframes progressGlow {
+    0%, 100% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
 }
 
-.control-section:last-child, .effect-section:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
+.loading-text {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 15px;
+    font-size: 0.95em;
+    color: #888;
 }
 
-h3 {
-    margin-bottom: 15px;
-    color: #4ecdc4;
-    font-size: 1.2em;
-}
-
-/* Buttons */
-.btn {
-    padding: 12px 24px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 1em;
+#loadingPercent {
     font-weight: 600;
-    transition: all 0.3s ease;
+    color: #4ecdc4;
+}
+
+/* ===============================================
+   MAIN STUDIO INTERFACE (BandLab Style)
+   =============================================== */
+.studio-interface {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: #1e1e1e;
+}
+
+/* ===============================================
+   TOP NAVIGATION BAR
+   =============================================== */
+.top-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    background: #111;
+    border-bottom: 1px solid #2a2a2a;
+    height: 56px;
+}
+
+.nav-left,
+.nav-center,
+.nav-right {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.nav-center {
+    flex: 1;
     justify-content: center;
-    width: 100%;
-    margin-bottom: 10px;
+    gap: 6px;
 }
 
-.btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.nav-btn {
+    background: transparent;
+    border: none;
+    color: #b0b0b0;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s ease;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.btn-record {
-    background: linear-gradient(45deg, #ff6b6b, #ee5a6f);
-    color: white;
+.nav-btn:hover {
+    background: #2a2a2a;
+    color: #fff;
 }
 
-.btn-record:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+.menu-btn {
+    font-size: 20px;
+    width: 36px;
+    height: 36px;
 }
 
-.btn-stop {
-    background: linear-gradient(45deg, #95a5a6, #7f8c8d);
-    color: white;
+.project-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-left: 8px;
 }
 
-.btn-play {
-    background: linear-gradient(45deg, #2ecc71, #27ae60);
-    color: white;
+.project-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: #fff;
 }
 
-.btn-pause {
-    background: linear-gradient(45deg, #f39c12, #e67e22);
-    color: white;
+.save-status {
+    font-size: 10px;
+    color: #ff5555;
 }
 
-.btn-import {
-    background: linear-gradient(45deg, #3498db, #2980b9);
-    color: white;
+.tempo-control {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: #2a2a2a;
+    padding: 4px 8px;
+    border-radius: 4px;
+    height: 32px;
 }
 
-.btn-export {
-    background: linear-gradient(45deg, #9b59b6, #8e44ad);
-    color: white;
+.tempo-icon {
+    font-size: 14px;
+    color: #b0b0b0;
 }
 
-.btn-small {
-    padding: 8px 16px;
-    font-size: 0.9em;
+#tempoInput {
+    width: 40px;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
 }
 
-.btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+#tempoInput:focus {
+    outline: none;
 }
 
-.icon {
-    font-size: 1.2em;
+.tempo-label {
+    font-size: 10px;
+    color: #666;
+    text-transform: uppercase;
 }
 
-/* File Input */
+.time-signature {
+    padding: 4px 10px;
+    background: #2a2a2a;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 13px;
+    color: #fff;
+    height: 32px;
+    display: flex;
+    align-items: center;
+}
+
+.key-btn {
+    background: #2a2a2a;
+    height: 32px;
+    padding: 4px 10px;
+    color: #fff;
+}
+
+.btn-primary,
+.btn-secondary {
+    padding: 6px 14px;
+    border-radius: 4px;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 12px;
+    height: 32px;
+}
+
+.btn-primary {
+    background: #ff5555;
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background: #ff6666;
+}
+
+.btn-secondary {
+    background: transparent;
+    color: #b0b0b0;
+    border: 1px solid #3a3a3a;
+}
+
+.btn-secondary:hover {
+    background: #2a2a2a;
+    color: #fff;
+}
+
+/* ===============================================
+   TRANSPORT CONTROLS (Center Bottom)
+   =============================================== */
+.transport-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #111;
+    border-bottom: 1px solid #2a2a2a;
+    position: relative;
+}
+
+.transport-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    border: none;
+    background: #2a2a2a;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.transport-btn:hover {
+    background: #3a3a3a;
+    transform: scale(1.05);
+}
+
+.play-btn {
+    background: #4ecdc4;
+    color: #000;
+    font-size: 18px;
+}
+
+.play-btn:hover {
+    background: #5ed9cf;
+}
+
+.stop-btn {
+    background: #555;
+}
+
+.record-btn {
+    background: transparent;
+    border: 2px solid #ff5555;
+    color: #ff5555;
+    font-size: 18px;
+}
+
+.record-btn:hover {
+    background: #ff5555;
+    color: #fff;
+}
+
+.record-btn.recording {
+    background: #ff5555;
+    color: #fff;
+    animation: recordPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes recordPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(255, 85, 85, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(255, 85, 85, 0);
+    }
+}
+
+.loop-btn {
+    background: #2a2a2a;
+}
+
+.loop-btn.active {
+    background: #4ecdc4;
+    color: #000;
+}
+
+.time-display {
+    position: absolute;
+    right: 20px;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+    color: #fff;
+    background: #2a2a2a;
+    padding: 6px 12px;
+    border-radius: 4px;
+}
+
+/* ===============================================
+   MAIN CONTENT AREA
+   =============================================== */
+.studio-main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ===============================================
+   LEFT SIDEBAR - TRACKS (Like BandLab)
+   =============================================== */
+.left-sidebar {
+    width: 260px;
+    background: #1a1a1a;
+    border-right: 1px solid #2a2a2a;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #2a2a2a;
+    background: #1a1a1a;
+}
+
+.sidebar-header h3 {
+    font-size: 11px;
+    font-weight: 700;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.icon-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    background: #4ecdc4;
+    border: none;
+    color: #000;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-btn:hover {
+    background: #5ed9cf;
+    transform: scale(1.05);
+}
+
+.tracks-list {
+    flex: 1;
+    padding: 8px;
+}
+
+.track-item {
+    background: #252525;
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 6px;
+    border: 1px solid #2a2a2a;
+    transition: all 0.15s ease;
+    cursor: pointer;
+}
+
+.track-item:hover {
+    background: #2a2a2a;
+    border-color: #3a3a3a;
+}
+
+.track-item.active {
+    border-color: #4ecdc4;
+    background: rgba(78, 205, 196, 0.08);
+}
+
+.track-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.track-icon {
+    font-size: 16px;
+}
+
+.track-name {
+    flex: 1;
+    font-weight: 600;
+    font-size: 12px;
+    color: #fff;
+}
+
+.track-menu-btn {
+    background: transparent;
+    border: none;
+    color: #666;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 4px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.track-menu-btn:hover {
+    color: #fff;
+}
+
+.track-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.track-control-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    color: #666;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.track-control-btn:hover {
+    background: #2a2a2a;
+    color: #fff;
+    border-color: #4ecdc4;
+}
+
+.track-control-btn.active {
+    background: #4ecdc4;
+    color: #000;
+    border-color: #4ecdc4;
+}
+
+.track-volume {
+    flex: 1;
+    height: 3px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #1a1a1a;
+    border-radius: 2px;
+    outline: none;
+}
+
+.track-volume::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #4ecdc4;
+    cursor: pointer;
+}
+
+.track-volume::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #4ecdc4;
+    cursor: pointer;
+    border: none;
+}
+
+.volume-value {
+    font-size: 10px;
+    color: #666;
+    min-width: 32px;
+    text-align: right;
+}
+
+.import-section {
+    padding: 12px;
+    border-top: 1px solid #2a2a2a;
+    background: #1a1a1a;
+}
+
+.import-section h4 {
+    font-size: 10px;
+    color: #666;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+}
+
 .file-input {
     display: none;
 }
 
-.file-info {
-    margin-top: 10px;
-    padding: 10px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 5px;
-    font-size: 0.9em;
-    min-height: 20px;
+.import-btn {
+    display: block;
+    width: 100%;
+    padding: 8px;
+    background: #252525;
+    border: 1px dashed #3a3a3a;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 11px;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-bottom: 6px;
 }
 
-/* Time Display */
-.time-display {
-    text-align: center;
-    font-size: 1.2em;
-    font-weight: 600;
+.import-btn:hover {
+    background: #2a2a2a;
+    border-color: #4ecdc4;
     color: #4ecdc4;
-    margin-top: 15px;
-    padding: 10px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
 }
 
-/* Sliders */
-.slider {
+/* ===============================================
+   CENTER WORKSPACE - TIMELINE (BandLab Dark)
+   =============================================== */
+.center-workspace {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #1e1e1e;
+    position: relative;
+}
+
+.timeline-header {
+    height: 36px;
+    background: #252525;
+    border-bottom: 1px solid #2a2a2a;
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+}
+
+.timeline-ruler {
+    flex: 1;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+.ruler-markers {
+    display: flex;
+    height: 100%;
+    position: relative;
+}
+
+.timeline-tracks {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: auto;
+    background: #1e1e1e;
+}
+
+.timeline-track {
+    height: 120px;
+    background: #252525;
+    border-bottom: 1px solid #2a2a2a;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.15s ease;
+}
+
+.timeline-track:hover {
+    background: #2a2a2a;
+}
+
+.track-canvas {
     width: 100%;
-    height: 6px;
-    border-radius: 5px;
-    background: rgba(255, 255, 255, 0.1);
-    outline: none;
-    -webkit-appearance: none;
-    margin: 10px 0;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
 }
 
-.slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: linear-gradient(45deg, #4ecdc4, #44a8a0);
-    cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-}
-
-.slider::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: linear-gradient(45deg, #4ecdc4, #44a8a0);
-    cursor: pointer;
-    border: none;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-}
-
-/* Volume Control */
-.volume-control {
-    margin-top: 15px;
-}
-
-.volume-control label {
-    display: block;
-    margin-bottom: 5px;
-    font-size: 0.9em;
-    color: #aaa;
-}
-
-/* Waveform */
-.waveform-container {
-    margin-bottom: 20px;
-}
-
-#waveform {
-    width: 100%;
-    height: 200px;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 10px;
-    display: block;
-}
-
-/* Meters */
-.meters {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-}
-
-.meter-container {
+.track-placeholder {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #444;
+    font-size: 12px;
+    pointer-events: none;
     text-align: center;
 }
 
-.meter-container label {
-    display: block;
-    margin-bottom: 10px;
-    font-size: 0.9em;
-    color: #aaa;
+.master-meter-panel {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(37, 37, 37, 0.98);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #2a2a2a;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
-.meter {
-    width: 100%;
-    height: 30px;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 15px;
+.meter-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #666;
+    letter-spacing: 0.5px;
+}
+
+.meter-bar {
+    width: 180px;
+    height: 6px;
+    background: #1a1a1a;
+    border-radius: 3px;
     overflow: hidden;
-    position: relative;
 }
 
 .meter-fill {
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, #2ecc71, #f39c12, #e74c3c);
-    transition: width 0.1s ease;
-    border-radius: 15px;
+    background: linear-gradient(90deg, #4ecdc4, #ffd700, #ff5555);
+    transition: width 0.05s ease;
+    border-radius: 3px;
+}
+
+/* ===============================================
+   RIGHT SIDEBAR - EFFECTS PANEL
+   =============================================== */
+.right-sidebar {
+    width: 300px;
+    background: #1a1a1a;
+    border-left: 1px solid #2a2a2a;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.effects-tabs {
+    display: flex;
+    background: #1a1a1a;
+    border-bottom: 1px solid #2a2a2a;
+}
+
+.effects-tab {
+    flex: 1;
+    padding: 10px;
+    background: transparent;
+    border: none;
+    color: #666;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border-bottom: 2px solid transparent;
+}
+
+.effects-tab:hover {
+    color: #fff;
+    background: #252525;
+}
+
+.effects-tab.active {
+    color: #4ecdc4;
+    border-bottom-color: #4ecdc4;
+}
+
+.effects-content,
+.mixer-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.mixer-content {
+    display: none;
+}
+
+.effect-group {
+    background: #252525;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 10px;
+    border: 1px solid #2a2a2a;
+}
+
+.effect-title {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: #fff;
+}
+
+.param-control {
+    margin-bottom: 12px;
+}
+
+.param-control label {
+    display: block;
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 6px;
+}
+
+.param-control input[type="range"] {
+    width: 100%;
+    height: 3px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #1a1a1a;
+    border-radius: 2px;
+    outline: none;
+}
+
+.param-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #4ecdc4;
+    cursor: pointer;
+}
+
+.param-control input[type="range"]::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #4ecdc4;
+    cursor: pointer;
+    border: none;
+}
+
+.param-value {
+    float: right;
+    font-size: 11px;
+    color: #4ecdc4;
+    font-weight: 600;
+}
+
+/* Recording Toggle */
+.recording-toggle {
+    background: rgba(78, 205, 196, 0.08);
+    border-color: rgba(78, 205, 196, 0.2);
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.toggle-label input[type="checkbox"] {
+    display: none;
+}
+
+.toggle-slider {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    background: #1a1a1a;
+    border-radius: 22px;
+    transition: all 0.2s ease;
+}
+
+.toggle-slider::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #666;
+    top: 3px;
+    left: 3px;
+    transition: all 0.2s ease;
+}
+
+.toggle-label input[type="checkbox"]:checked + .toggle-slider {
+    background: #4ecdc4;
+}
+
+.toggle-label input[type="checkbox"]:checked + .toggle-slider::after {
+    transform: translateX(18px);
+    background: #fff;
+}
+
+.toggle-text {
+    font-size: 12px;
+    color: #fff;
+    font-weight: 500;
+}
+
+.effect-status {
+    margin-top: 8px;
+    font-size: 10px;
+    color: #ff5555;
+    font-weight: 500;
 }
 
 /* EQ Controls */
 .eq-controls {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 15px;
-}
-
-.eq-band {
+    gap: 12px;
     text-align: center;
 }
 
 .eq-band label {
     display: block;
-    margin-bottom: 10px;
-    font-size: 0.85em;
-    color: #aaa;
+    font-size: 10px;
+    color: #666;
+    margin-bottom: 6px;
+}
+
+.eq-band input[type="range"] {
+    height: 80px;
+    writing-mode: bt-lr;
+    -webkit-appearance: slider-vertical;
 }
 
 .eq-band span {
     display: block;
-    margin-top: 10px;
-    font-size: 0.9em;
+    margin-top: 6px;
+    font-size: 10px;
     color: #4ecdc4;
     font-weight: 600;
 }
 
-/* Parameter Controls */
-.param-control {
-    margin-bottom: 15px;
+/* Auto-Tune Group */
+.autotune-group {
+    background: rgba(78, 205, 196, 0.05);
+    border-color: rgba(78, 205, 196, 0.15);
 }
 
-.param-control label {
-    display: block;
-    margin-bottom: 5px;
-    font-size: 0.9em;
-    color: #aaa;
-}
-
-.param-control span {
-    display: inline-block;
-    margin-left: 10px;
-    color: #4ecdc4;
-    font-weight: 600;
-    font-size: 0.9em;
-}
-
-/* Recording Controls */
-.record-controls {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-}
-
-/* Responsive */
-@media (max-width: 1400px) {
-    .main-content {
-        grid-template-columns: 1fr;
-    }
-    
-    .right-panel {
-        max-height: none;
-    }
-}
-
-@media (max-width: 768px) {
-    header h1 {
-        font-size: 1.8em;
-    }
-    
-    .eq-controls {
-        grid-template-columns: 1fr;
-    }
-    
-    .meters {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* Pitch Detection */
-#detectedPitch {
-    color: #4ecdc4;
-    font-weight: 600;
-    font-size: 1.1em;
-}
-
-/* Recording Indicator */
-.recording {
-    animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.6;
-    }
-}
-
-/* Audio Import Section */
-.audio-import-section {
-    margin: 20px 0;
-    padding: 15px;
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.audio-track-waveform {
+.effect-btn {
     width: 100%;
-    height: 80px;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 8px;
-    margin-top: 10px;
-    position: relative;
-    overflow: hidden;
+    padding: 8px;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    color: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    transition: all 0.15s ease;
+    margin-top: 8px;
 }
 
-.audio-track-waveform canvas {
+.effect-btn:hover {
+    background: #2a2a2a;
+    border-color: #4ecdc4;
+    color: #4ecdc4;
+}
+
+.detected-pitch {
+    margin-top: 8px;
+    text-align: center;
+    font-size: 13px;
+    color: #4ecdc4;
+    font-weight: 600;
+    padding: 6px;
+    background: rgba(78, 205, 196, 0.08);
+    border-radius: 4px;
+}
+
+/* Export Button */
+.export-btn {
     width: 100%;
-    height: 100%;
-}
-
-/* Enhanced Autotune Section */
-.autotune-section {
-    background: rgba(78, 205, 196, 0.1);
-    padding: 15px;
-    border-radius: 10px;
-    border: 1px solid rgba(78, 205, 196, 0.3);
-}
-
-.autotune-intensity {
-    position: relative;
-}
-
-.autotune-intensity::after {
-    content: attr(data-intensity);
-    position: absolute;
-    right: 0;
-    top: -5px;
-    font-size: 1.2em;
+    padding: 12px;
+    background: #4ecdc4;
+    border: none;
+    color: #000;
+    border-radius: 6px;
+    font-size: 13px;
     font-weight: 700;
-    color: #4ecdc4;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-top: 8px;
 }
 
-/* Autotune intensity indicator */
-.intensity-indicator {
+.export-btn:hover {
+    background: #5ed9cf;
+    transform: translateY(-1px);
+}
+
+.export-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Mixer Panel */
+.mixer-channels {
     display: flex;
-    justify-content: space-between;
-    margin-top: 5px;
-    font-size: 0.8em;
+    gap: 12px;
+    justify-content: center;
+    padding: 16px 0;
+}
+
+.mixer-channel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.channel-label {
+    font-size: 10px;
     color: #666;
+    font-weight: 700;
 }
 
-.intensity-indicator span.active {
-    color: #4ecdc4;
-    font-weight: 600;
+.channel-meter {
+    width: 6px;
+    height: 120px;
+    background: #1a1a1a;
+    border-radius: 3px;
 }
 
-/* ========================================
-   RESPONSIVE DESIGN ENHANCEMENTS
-   Add these styles to your styles.css file
-   ======================================== */
-
-/* Base adjustments for better mobile handling */
-html {
-    -webkit-text-size-adjust: 100%;
-    -ms-text-size-adjust: 100%;
+.channel-fader {
+    height: 120px;
+    writing-mode: bt-lr;
+    -webkit-appearance: slider-vertical;
 }
 
-body {
-    overflow-x: hidden;
-    padding: 10px;
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
 }
 
-.container {
-    max-width: 100%;
-    padding: 0;
+::-webkit-scrollbar-track {
+    background: #1a1a1a;
 }
 
-/* ========================================
-   TABLET VIEW (768px - 1400px)
-   ======================================== */
-@media (max-width: 1400px) {
-    .main-content {
-        grid-template-columns: 1fr;
-        gap: 15px;
-    }
-    
-    .right-panel {
-        max-height: none;
-    }
-    
-    /* Make effects panel show in two columns on tablets */
-    .right-panel {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 15px;
-    }
-    
-    .effect-section {
-        margin-bottom: 0;
-        padding-bottom: 0;
-        border-bottom: none;
+::-webkit-scrollbar-thumb {
+    background: #2a2a2a;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #3a3a3a;
+}
+
+/* ===============================================
+   RESPONSIVE DESIGN
+   =============================================== */
+@media (max-width: 1200px) {
+    .left-sidebar,
+    .right-sidebar {
+        width: 240px;
     }
 }
 
-/* ========================================
-   MOBILE VIEW (Below 768px)
-   ======================================== */
-@media (max-width: 768px) {
-    body {
-        padding: 5px;
-    }
-    
-    /* Header adjustments */
-    header {
-        padding: 15px 10px;
-        margin-bottom: 15px;
-    }
-    
-    header h1 {
-        font-size: 1.8em;
-        margin-bottom: 5px;
-    }
-    
-    header p {
-        font-size: 0.9em;
-    }
-    
-    /* Main content single column */
-    .main-content {
-        grid-template-columns: 1fr;
-        gap: 10px;
-    }
-    
-    /* All panels full width */
-    .left-panel, 
-    .center-panel, 
-    .right-panel {
-        padding: 15px;
-        width: 100%;
-    }
-    
-    /* Effects panel back to single column */
-    .right-panel {
-        display: block;
-        max-height: none;
-    }
-    
-    .effect-section {
-        margin-bottom: 20px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    
-    .effect-section:last-child {
-        border-bottom: none;
-        margin-bottom: 0;
-        padding-bottom: 0;
-    }
-    
-    /* Button adjustments */
-    .record-controls {
-        grid-template-columns: 1fr;
-        gap: 8px;
-    }
-    
-    .btn {
-        padding: 14px 20px;
-        font-size: 0.95em;
-        margin-bottom: 8px;
-    }
-    
-    .btn-small {
-        padding: 10px 16px;
-        font-size: 0.85em;
-    }
-    
-    .icon {
-        font-size: 1.1em;
-    }
-    
-    /* EQ controls stack vertically */
-    .eq-controls {
-        grid-template-columns: 1fr;
-        gap: 15px;
-    }
-    
-    /* Meters stack vertically */
-    .meters {
-        grid-template-columns: 1fr;
-        gap: 15px;
-    }
-    
-    /* Waveform adjustments */
-    #waveform {
-        height: 150px;
-    }
-    
-    .audio-track-waveform {
-        height: 60px;
-    }
-    
-    /* Time display */
-    .time-display {
-        font-size: 1.1em;
-        padding: 8px;
-    }
-    
-    /* Effects toggle container */
-    .effects-toggle-container {
-        padding: 12px !important;
-        margin: 12px 0 !important;
-    }
-    
-    .effects-toggle-container label {
+@media (max-width: 900px) {
+    .studio-main {
         flex-direction: column;
-        align-items: flex-start !important;
-        gap: 10px !important;
     }
     
-    .effects-toggle-container span:last-child {
-        font-size: 13px !important;
-    }
-    
-    #effectsStatus {
-        font-size: 11px !important;
-        margin-top: 6px !important;
-    }
-    
-    /* Parameter controls */
-    .param-control {
-        margin-bottom: 12px;
-    }
-    
-    .param-control label {
-        font-size: 0.85em;
-    }
-    
-    .param-control span {
-        font-size: 0.85em;
-    }
-    
-    /* Slider adjustments for touch */
-    .slider {
-        height: 8px;
-        margin: 12px 0;
-    }
-    
-    .slider::-webkit-slider-thumb {
-        width: 22px;
-        height: 22px;
-    }
-    
-    .slider::-moz-range-thumb {
-        width: 22px;
-        height: 22px;
-    }
-    
-    /* Volume control */
-    .volume-control {
-        margin-top: 12px;
-    }
-    
-    /* File info */
-    .file-info {
-        font-size: 0.85em;
-        padding: 8px;
-    }
-    
-    /* Autotune section */
-    .autotune-section {
-        padding: 12px;
-    }
-    
-    .autotune-intensity::after {
-        font-size: 1em;
-        top: -3px;
-    }
-    
-    .intensity-indicator {
-        flex-wrap: wrap;
-        gap: 5px;
-        font-size: 0.75em;
-    }
-    
-    #detectedPitch {
-        font-size: 1em;
+    .left-sidebar,
+    .right-sidebar {
+        width: 100%;
+        max-height: 280px;
     }
 }
 
-/* ========================================
-   SMALL MOBILE VIEW (Below 480px)
-   ======================================== */
-@media (max-width: 480px) {
-    header h1 {
-        font-size: 1.5em;
+@media (max-width: 600px) {
+    .top-nav {
+        padding: 0 10px;
     }
     
-    header p {
-        font-size: 0.85em;
-    }
-    
-    .left-panel, 
-    .center-panel, 
-    .right-panel {
-        padding: 12px;
-    }
-    
-    h3 {
-        font-size: 1.1em;
-        margin-bottom: 12px;
-    }
-    
-    .btn {
-        padding: 12px 16px;
-        font-size: 0.9em;
-    }
-    
-    .time-display {
-        font-size: 1em;
-    }
-    
-    #waveform {
-        height: 120px;
-    }
-    
-    .audio-track-waveform {
-        height: 50px;
-    }
-    
-    .intensity-indicator span {
-        font-size: 0.7em;
-    }
-    
-    /* Make toggle switch slightly smaller */
-    .effects-toggle-container label > div:first-child {
-        width: 45px !important;
-        height: 24px !important;
-    }
-    
-    .effects-toggle-container label > div:first-child span:last-child {
-        height: 18px !important;
-        width: 18px !important;
-    }
-    
-    #effectsToggle:checked + span + span {
-        transform: translateX(21px) !important;
-    }
-}
-
-/* ========================================
-   LANDSCAPE MOBILE (Height < 500px)
-   ======================================== */
-@media (max-height: 500px) and (orientation: landscape) {
-    header {
-        padding: 10px;
-        margin-bottom: 10px;
-    }
-    
-    header h1 {
-        font-size: 1.3em;
-        margin-bottom: 3px;
-    }
-    
-    header p {
-        font-size: 0.8em;
-    }
-    
-    .left-panel, 
-    .center-panel, 
-    .right-panel {
-        padding: 10px;
-    }
-    
-    #waveform {
-        height: 100px;
-    }
-    
-    .btn {
-        padding: 10px 14px;
-        font-size: 0.85em;
-    }
-    
-    h3 {
-        font-size: 1em;
-        margin-bottom: 10px;
-    }
-}
-
-/* ========================================
-   TOUCH DEVICE ENHANCEMENTS
-   ======================================== */
-@media (hover: none) and (pointer: coarse) {
-    /* Increase touch targets */
-    .btn {
-        min-height: 44px;
-    }
-    
-    .slider {
-        height: 10px;
-    }
-    
-    .slider::-webkit-slider-thumb {
-        width: 24px;
-        height: 24px;
-    }
-    
-    .slider::-moz-range-thumb {
-        width: 24px;
-        height: 24px;
-    }
-    
-    /* Prevent double-tap zoom */
-    button, 
-    input, 
-    label {
-        touch-action: manipulation;
-    }
-    
-    /* Better tap feedback */
-    .btn:active {
-        transform: scale(0.98);
-    }
-}
-
-/* ========================================
-   ACCESSIBILITY IMPROVEMENTS
-   ======================================== */
-@media (prefers-reduced-motion: reduce) {
-    * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-    }
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-    .btn {
-        border: 2px solid currentColor;
-    }
-    
-    .slider::-webkit-slider-thumb,
-    .slider::-moz-range-thumb {
-        border: 2px solid white;
-    }
-}
-
-/* ========================================
-   PRINT STYLES (Optional)
-   ======================================== */
-@media print {
-    body {
-        background: white;
-        color: black;
-    }
-    
-    .btn,
-    .file-input,
-    #waveform {
+    .project-info {
         display: none;
     }
     
-    .main-content {
-        grid-template-columns: 1fr;
+    .transport-btn {
+        width: 36px;
+        height: 36px;
     }
 }
