@@ -2,9 +2,393 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Voice Studio Pro - BandLab Style</title>
     <link rel="stylesheet" href="studio.css">
+    <style>
+        /* Additional Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-content {
+            background: #1a1a1a;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid #2a2a2a;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+
+        .modal.active .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .modal-header h3 {
+            font-size: 18px;
+            color: #fff;
+            margin: 0;
+        }
+
+        .modal-close {
+            background: transparent;
+            border: none;
+            color: #666;
+            font-size: 28px;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.15s ease;
+        }
+
+        .modal-close:hover {
+            background: #2a2a2a;
+            color: #fff;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        /* Track Option Styles */
+        .track-option {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: #252525;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            border: 1px solid #2a2a2a;
+            transition: all 0.15s ease;
+        }
+
+        .track-option:hover {
+            background: #2a2a2a;
+            border-color: #4ecdc4;
+            transform: translateX(4px);
+        }
+
+        .track-option-icon {
+            font-size: 32px;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(78, 205, 196, 0.1);
+            border-radius: 8px;
+        }
+
+        .track-option-info h4 {
+            font-size: 14px;
+            color: #fff;
+            margin: 0 0 4px 0;
+        }
+
+        .track-option-info p {
+            font-size: 12px;
+            color: #666;
+            margin: 0;
+        }
+
+        /* Recorder Modal */
+        .recorder-visualizer {
+            background: #252525;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #recorderCanvas {
+            width: 100%;
+            height: 150px;
+            max-width: 400px;
+        }
+
+        .recorder-controls {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .recorder-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: #2a2a2a;
+            border: 1px solid #3a3a3a;
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.15s ease;
+        }
+
+        .recorder-btn:hover:not(:disabled) {
+            background: #3a3a3a;
+            border-color: #4ecdc4;
+        }
+
+        .recorder-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .record-circle {
+            width: 16px;
+            height: 16px;
+            background: #ff5555;
+            border-radius: 50%;
+        }
+
+        .stop-square {
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border-radius: 2px;
+        }
+
+        .recorder-timer {
+            text-align: center;
+            font-size: 24px;
+            font-family: 'Courier New', monospace;
+            color: #4ecdc4;
+            margin-bottom: 12px;
+        }
+
+        .recorder-status {
+            text-align: center;
+            font-size: 13px;
+            color: #666;
+        }
+
+        /* Sampler Modal */
+        .sampler-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .sample-pad {
+            position: relative;
+            background: #252525;
+            border: 2px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: center;
+        }
+
+        .sample-pad:hover {
+            background: #2a2a2a;
+            border-color: #4ecdc4;
+            transform: translateY(-2px);
+        }
+
+        .sample-pad.active {
+            background: #4ecdc4;
+            border-color: #4ecdc4;
+        }
+
+        .sample-pad.active .pad-number,
+        .sample-pad.active .pad-label {
+            color: #000;
+        }
+
+        .pad-number {
+            font-size: 24px;
+            font-weight: 700;
+            color: #4ecdc4;
+            margin-bottom: 8px;
+        }
+
+        .pad-label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .pad-record-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 28px;
+            height: 28px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+
+        .pad-record-btn:hover {
+            background: #2a2a2a;
+            border-color: #4ecdc4;
+        }
+
+        .sampler-info {
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            padding: 12px;
+            background: #252525;
+            border-radius: 6px;
+        }
+
+        /* Context Menu */
+        .context-menu {
+            position: fixed;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+            z-index: 3000;
+            min-width: 180px;
+            overflow: hidden;
+        }
+
+        .context-menu-item {
+            padding: 10px 16px;
+            color: #fff;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .context-menu-item:hover {
+            background: #2a2a2a;
+            color: #4ecdc4;
+        }
+
+        /* Mobile Responsive for Modals */
+        @media (max-width: 768px) {
+            .modal-content {
+                max-width: 95%;
+                max-height: 90vh;
+            }
+
+            .modal-header {
+                padding: 12px 16px;
+            }
+
+            .modal-header h3 {
+                font-size: 16px;
+            }
+
+            .modal-body {
+                padding: 16px;
+            }
+
+            .track-option {
+                padding: 12px;
+            }
+
+            .track-option-icon {
+                font-size: 28px;
+                width: 44px;
+                height: 44px;
+            }
+
+            .track-option-info h4 {
+                font-size: 13px;
+            }
+
+            .track-option-info p {
+                font-size: 11px;
+            }
+
+            .sampler-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            .sample-pad {
+                padding: 16px;
+            }
+
+            .pad-number {
+                font-size: 20px;
+            }
+
+            .recorder-btn {
+                padding: 10px 18px;
+                font-size: 13px;
+            }
+
+            #recorderCanvas {
+                height: 120px;
+            }
+
+            .recorder-timer {
+                font-size: 20px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .sampler-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .recorder-controls {
+                flex-direction: column;
+            }
+
+            .recorder-btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
 </head>
 <body>
     <!-- Loading Screen -->
@@ -26,12 +410,15 @@
         </div>
     </div>
 
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay"></div>
+
     <!-- Main Studio Interface -->
     <div class="studio-interface">
         <!-- Top Navigation Bar -->
         <nav class="top-nav">
             <div class="nav-left">
-                <button class="nav-btn menu-btn">☰</button>
+                <button class="nav-btn menu-btn" id="leftMenuBtn">☰</button>
                 <div class="project-info">
                     <span class="project-name">Untitled Project</span>
                     <span class="save-status">● Not Saved</span>
@@ -51,19 +438,19 @@
             <div class="nav-right">
                 <button class="btn-secondary">Share</button>
                 <button class="btn-primary">Publish</button>
+                <button class="nav-btn menu-btn" id="rightMenuBtn">⚙</button>
             </div>
         </nav>
 
         <!-- Transport Controls -->
         <div class="transport-controls">
+            <div class="time-display">00:00:00</div>
             <button class="transport-btn" title="Skip to Start">⏮</button>
             <button class="transport-btn record-btn" title="Record">⏺</button>
             <button class="transport-btn play-btn" title="Play">▶</button>
             <button class="transport-btn stop-btn" title="Stop">⏹</button>
             <button class="transport-btn loop-btn" title="Loop">🔁</button>
             <button class="transport-btn" title="Skip to End">⏭</button>
-            
-            <div class="time-display">00:00:00</div>
         </div>
 
         <!-- Main Content Area -->
@@ -111,8 +498,8 @@
             <!-- Right Sidebar - Effects & Mixer -->
             <aside class="right-sidebar">
                 <div class="effects-tabs">
-                    <button class="effects-tab active">Effects</button>
-                    <button class="effects-tab">Mixer</button>
+                    <button class="effects-tab active" data-tab="effects">Effects</button>
+                    <button class="effects-tab" data-tab="mixer">Mixer</button>
                 </div>
 
                 <!-- Effects Content -->
@@ -218,7 +605,7 @@
     </div>
 
     <!-- Add Track Menu Modal -->
-    <div id="addTrackMenu" class="modal" style="display: none;">
+    <div id="addTrackMenu" class="modal">
         <div class="modal-content add-track-modal">
             <div class="modal-header">
                 <h3>Add New Track</h3>
@@ -258,7 +645,7 @@
     </div>
 
     <!-- Voice Recorder Modal -->
-    <div id="voiceRecorderModal" class="modal" style="display: none;">
+    <div id="voiceRecorderModal" class="modal">
         <div class="modal-content recorder-modal">
             <div class="modal-header">
                 <h3>🎤 Voice Recorder</h3>
@@ -285,7 +672,7 @@
     </div>
 
     <!-- Sampler Modal -->
-    <div id="samplerModal" class="modal" style="display: none;">
+    <div id="samplerModal" class="modal">
         <div class="modal-content sampler-modal">
             <div class="modal-header">
                 <h3>🎹 Sample Pads</h3>
@@ -340,8 +727,109 @@
 
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script>
+        // Mobile Menu Toggle Script
+        document.addEventListener('DOMContentLoaded', function() {
+            const leftMenuBtn = document.getElementById('leftMenuBtn');
+            const rightMenuBtn = document.getElementById('rightMenuBtn');
+            const leftSidebar = document.querySelector('.left-sidebar');
+            const rightSidebar = document.querySelector('.right-sidebar');
+            const mobileOverlay = document.querySelector('.mobile-overlay');
+            
+            // Left sidebar toggle
+            leftMenuBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                leftSidebar.classList.toggle('mobile-open');
+                rightSidebar.classList.remove('mobile-open');
+                mobileOverlay.classList.toggle('active', leftSidebar.classList.contains('mobile-open'));
+            });
+            
+            // Right sidebar toggle
+            rightMenuBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                rightSidebar.classList.toggle('mobile-open');
+                leftSidebar.classList.remove('mobile-open');
+                mobileOverlay.classList.toggle('active', rightSidebar.classList.contains('mobile-open'));
+            });
+            
+            // Close sidebars when clicking overlay
+            mobileOverlay.addEventListener('click', function() {
+                leftSidebar.classList.remove('mobile-open');
+                rightSidebar.classList.remove('mobile-open');
+                mobileOverlay.classList.remove('active');
+            });
+            
+            // Tab switching
+            const effectsTabs = document.querySelectorAll('.effects-tab');
+            const effectsContent = document.querySelector('.effects-content');
+            const mixerContent = document.querySelector('.mixer-content');
+            
+            effectsTabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    effectsTabs.forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    if (this.dataset.tab === 'effects') {
+                        effectsContent.style.display = 'block';
+                        mixerContent.style.display = 'none';
+                    } else {
+                        effectsContent.style.display = 'none';
+                        mixerContent.style.display = 'block';
+                    }
+                });
+            });
+            
+            // Modal functionality
+            const modals = document.querySelectorAll('.modal');
+            const modalCloses = document.querySelectorAll('.modal-close');
+            
+            modalCloses.forEach(close => {
+                close.addEventListener('click', function() {
+                    this.closest('.modal').classList.remove('active');
+                });
+            });
+            
+            // Close modal when clicking outside
+            modals.forEach(modal => {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        this.classList.remove('active');
+                    }
+                });
+            });
+            
+            // Add track button
+            const addTrackBtn = document.querySelector('.add-track-btn');
+            const addTrackMenu = document.getElementById('addTrackMenu');
+            
+            addTrackBtn.addEventListener('click', function() {
+                addTrackMenu.classList.add('active');
+            });
+            
+            // Track options
+            const trackOptions = document.querySelectorAll('.track-option');
+            const voiceRecorderModal = document.getElementById('voiceRecorderModal');
+            const samplerModal = document.getElementById('samplerModal');
+            
+            trackOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    const type = this.dataset.type;
+                    addTrackMenu.classList.remove('active');
+                    
+                    if (type === 'voice-recorder') {
+                        voiceRecorderModal.classList.add('active');
+                    } else if (type === 'sampler') {
+                        samplerModal.classList.add('active');
+                    }
+                });
+            });
+            
+            // Loading screen
+            setTimeout(() => {
+                document.querySelector('.loading-screen').classList.add('fade-out');
+            }, 2000);
+        });
+    </script>
     <script src="studio.js"></script>
 </body>
 </html>
-
-
