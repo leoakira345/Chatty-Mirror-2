@@ -3,240 +3,343 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Studio Pro</title>
+    <title>Voice Studio Pro - BandLab Style</title>
     <link rel="stylesheet" href="studio.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🎙️ Voice Studio Pro</h1>
-            <p>Professional Voice Recording & Mixing</p>
-        </header>
-
-        <div class="main-content">
-            <!-- Left Panel - Controls -->
-            <div class="left-panel">
-                <section class="control-section">
-                    <h3>Recording</h3>
-                    
-                    <!-- Effects Toggle for Recording -->
-                    <div class="effects-toggle-container" style="margin: 15px 0; padding: 15px; background: rgba(78, 205, 196, 0.1); border-radius: 8px; border: 1px solid rgba(78, 205, 196, 0.3);">
-                        <label style="display: flex; align-items: center; gap: 12px; cursor: pointer; user-select: none;">
-                            <div style="position: relative; width: 50px; height: 26px;">
-                                <input type="checkbox" id="effectsToggle" style="opacity: 0; width: 0; height: 0; position: absolute;">
-                                <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #555; transition: 0.3s; border-radius: 26px;"></span>
-                                <span style="position: absolute; content: ''; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: 0.3s; border-radius: 50%;"></span>
-                            </div>
-                            <span style="font-size: 14px; color: #b0b0b0; font-weight: 500;">Apply Effects on Recording</span>
-                        </label>
-                        <div id="effectsStatus" style="font-size: 12px; margin-top: 8px; color: #ff6b6b; font-weight: 500;">
-                            🔴 Recording clean/raw voice (no effects)
-                        </div>
-                    </div>
-                    
-                    <div class="record-controls">
-                        <button id="recordBtn" class="btn btn-record">
-                            <span class="icon">⏺</span> Record
-                        </button>
-                        <button id="stopBtn" class="btn btn-stop" disabled>
-                            <span class="icon">⏹</span> Stop
-                        </button>
-                        <button id="playBtn" class="btn btn-play" disabled>
-                            <span class="icon">▶</span> Play
-                        </button>
-                        <button id="pauseBtn" class="btn btn-pause" disabled>
-                            <span class="icon">⏸</span> Pause
-                        </button>
-                    </div>
-                    <div class="time-display">
-                        <span id="currentTime">00:00</span> / <span id="duration">00:00</span>
-                    </div>
-                </section>
-
-                <section class="control-section">
-                    <h3>Import Instrumental</h3>
-                    <input type="file" id="instrumentalInput" accept="audio/*" class="file-input">
-                    <label for="instrumentalInput" class="btn btn-import">
-                        <span class="icon">📁</span> Load Instrumental
-                    </label>
-                    <div id="instrumentalInfo" class="file-info"></div>
-                    <div class="volume-control">
-                        <label>Instrumental Volume</label>
-                        <input type="range" id="instVolume" min="0" max="100" value="70" class="slider">
-                        <span id="instVolumeValue">70%</span>
-                    </div>
-                </section>
-
-                <section class="control-section">
-                    <h3>Export</h3>
-                    <button id="exportBtn" class="btn btn-export" disabled>
-                        <span class="icon">💾</span> Export Mixed Audio
-                    </button>
-                </section>
+    <!-- Loading Screen -->
+    <div class="loading-screen">
+        <div class="loading-content">
+            <div class="studio-logo">
+                <div class="logo-icon">🎙️</div>
+                <h1>Voice Studio Pro</h1>
             </div>
-
-            <!-- Center Panel - Waveform & Meters -->
-            <div class="center-panel">
-                <div class="waveform-container">
-                    <h3>Waveform</h3>
-                    <canvas id="waveform" width="800" height="200"></canvas>
+            <div class="loading-bar-container">
+                <div class="loading-bar">
+                    <div class="loading-progress"></div>
                 </div>
-                
-                <!-- NEW: Audio Track Import Section -->
-                <div class="audio-import-section">
-                    <h3>Import Audio Track</h3>
-                    <input type="file" id="audioTrackInput" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac" class="file-input">
-                    <label for="audioTrackInput" class="btn btn-import">
-                        <span class="icon">🎵</span> Load Audio Track
-                    </label>
-                    <div id="audioTrackInfo" class="file-info"></div>
-                    <div id="audioTrackWaveform" class="audio-track-waveform"></div>
+                <div class="loading-text">
+                    <span>Loading Studio...</span>
+                    <span id="loadingPercent">0%</span>
                 </div>
-                
-                <div class="meters">
-                    <div class="meter-container">
-                        <label>Voice Level</label>
-                        <div class="meter">
-                            <div id="voiceMeter" class="meter-fill"></div>
-                        </div>
-                    </div>
-                    <div class="meter-container">
-                        <label>Master Level</label>
-                        <div class="meter">
-                            <div id="masterMeter" class="meter-fill"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Panel - Effects -->
-            <div class="right-panel effects-panel">
-                <section class="effect-section">
-                    <h3>🎚️ Equalizer</h3>
-                    <div class="eq-controls">
-                        <div class="eq-band">
-                            <label>Low (100Hz)</label>
-                            <input type="range" id="eqLow" min="-12" max="12" value="0" step="0.1" class="slider vertical">
-                            <span id="eqLowValue">0 dB</span>
-                        </div>
-                        <div class="eq-band">
-                            <label>Mid (1kHz)</label>
-                            <input type="range" id="eqMid" min="-12" max="12" value="0" step="0.1" class="slider vertical">
-                            <span id="eqMidValue">0 dB</span>
-                        </div>
-                        <div class="eq-band">
-                            <label>High (8kHz)</label>
-                            <input type="range" id="eqHigh" min="-12" max="12" value="0" step="0.1" class="slider vertical">
-                            <span id="eqHighValue">0 dB</span>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="effect-section">
-                    <h3>🎛️ Compressor</h3>
-                    <div class="param-control">
-                        <label>Threshold</label>
-                        <input type="range" id="compThreshold" min="-60" max="0" value="-24" class="slider">
-                        <span id="compThresholdValue">-24 dB</span>
-                    </div>
-                    <div class="param-control">
-                        <label>Ratio</label>
-                        <input type="range" id="compRatio" min="1" max="20" value="4" step="0.1" class="slider">
-                        <span id="compRatioValue">4:1</span>
-                    </div>
-                    <div class="param-control">
-                        <label>Attack</label>
-                        <input type="range" id="compAttack" min="0" max="1" value="0.003" step="0.001" class="slider">
-                        <span id="compAttackValue">3 ms</span>
-                    </div>
-                    <div class="param-control">
-                        <label>Release</label>
-                        <input type="range" id="compRelease" min="0" max="1" value="0.25" step="0.01" class="slider">
-                        <span id="compReleaseValue">250 ms</span>
-                    </div>
-                </section>
-
-                <section class="effect-section">
-                    <h3>🌊 Reverb</h3>
-                    <div class="param-control">
-                        <label>Decay</label>
-                        <input type="range" id="reverbDecay" min="0.1" max="10" value="1.5" step="0.1" class="slider">
-                        <span id="reverbDecayValue">1.5 s</span>
-                    </div>
-                    <div class="param-control">
-                        <label>Wet/Dry</label>
-                        <input type="range" id="reverbWet" min="0" max="100" value="20" class="slider">
-                        <span id="reverbWetValue">20%</span>
-                    </div>
-                </section>
-
-                <section class="effect-section">
-                    <h3>🔊 Echo</h3>
-                    <div class="param-control">
-                        <label>Delay Time</label>
-                        <input type="range" id="echoDelay" min="0" max="1000" value="250" class="slider">
-                        <span id="echoDelayValue">250 ms</span>
-                    </div>
-                    <div class="param-control">
-                        <label>Feedback</label>
-                        <input type="range" id="echoFeedback" min="0" max="90" value="30" class="slider">
-                        <span id="echoFeedbackValue">30%</span>
-                    </div>
-                    <div class="param-control">
-                        <label>Wet/Dry</label>
-                        <input type="range" id="echoWet" min="0" max="100" value="25" class="slider">
-                        <span id="echoWetValue">25%</span>
-                    </div>
-                </section>
-
-                <!-- UPDATED: Enhanced Auto-Tune Section -->
-                <section class="effect-section autotune-section">
-                    <h3>🎵 Auto-Tune</h3>
-                    <div class="param-control">
-                        <label>Detected Pitch: <span id="detectedPitch">--</span></label>
-                        <button id="detectPitchBtn" class="btn btn-small">Detect Pitch</button>
-                    </div>
-                    <div class="param-control autotune-intensity" data-intensity="0%">
-                        <label>Autotune Intensity</label>
-                        <input type="range" id="autotuneIntensity" min="0" max="100" value="0" class="slider">
-                        <div class="intensity-indicator">
-                            <span id="subtle">Subtle</span>
-                            <span id="moderate">Moderate</span>
-                            <span id="intense">Intense</span>
-                            <span id="extreme">Extreme</span>
-                        </div>
-                    </div>
-                    <div class="param-control">
-                        <label>Pitch Shift (Fine Tune)</label>
-                        <input type="range" id="pitchShift" min="-12" max="12" value="0" step="0.1" class="slider">
-                        <span id="pitchShiftValue">0 semitones</span>
-                    </div>
-                    <div class="param-control">
-                        <label>Formant Preservation</label>
-                        <input type="range" id="formantPreserve" min="0" max="100" value="50" class="slider">
-                        <span id="formantPreserveValue">50%</span>
-                    </div>
-                </section>
             </div>
         </div>
     </div>
 
+    <!-- Main Studio Interface -->
+    <div class="studio-interface">
+        <!-- Top Navigation Bar -->
+        <nav class="top-nav">
+            <div class="nav-left">
+                <button class="nav-btn menu-btn">☰</button>
+                <div class="project-info">
+                    <span class="project-name">Untitled Project</span>
+                    <span class="save-status">● Not Saved</span>
+                </div>
+            </div>
+
+            <div class="nav-center">
+                <div class="tempo-control">
+                    <span class="tempo-icon">♩</span>
+                    <input type="number" id="tempoInput" value="120" min="40" max="240">
+                    <span class="tempo-label">BPM</span>
+                </div>
+                <div class="time-signature">4/4</div>
+                <button class="nav-btn key-btn">C Major</button>
+            </div>
+
+            <div class="nav-right">
+                <button class="btn-secondary">Share</button>
+                <button class="btn-primary">Publish</button>
+            </div>
+        </nav>
+
+        <!-- Transport Controls -->
+        <div class="transport-controls">
+            <button class="transport-btn" title="Skip to Start">⏮</button>
+            <button class="transport-btn record-btn" title="Record">⏺</button>
+            <button class="transport-btn play-btn" title="Play">▶</button>
+            <button class="transport-btn stop-btn" title="Stop">⏹</button>
+            <button class="transport-btn loop-btn" title="Loop">🔁</button>
+            <button class="transport-btn" title="Skip to End">⏭</button>
+            
+            <div class="time-display">00:00:00</div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="studio-main">
+            <!-- Left Sidebar - Tracks -->
+            <aside class="left-sidebar">
+                <div class="sidebar-header">
+                    <h3>Tracks</h3>
+                    <button class="icon-btn add-track-btn" title="Add Track">+</button>
+                </div>
+
+                <div class="tracks-list">
+                    <!-- Tracks will be dynamically added here -->
+                </div>
+
+                <div class="import-section">
+                    <h4>Import Audio</h4>
+                    <label class="import-btn">
+                        📁 Browse Files
+                    </label>
+                </div>
+            </aside>
+
+            <!-- Center Workspace - Timeline -->
+            <main class="center-workspace">
+                <div class="timeline-header">
+                    <div class="timeline-ruler">
+                        <div class="ruler-markers"></div>
+                    </div>
+                </div>
+
+                <div class="timeline-tracks">
+                    <!-- Timeline tracks will be added here -->
+                </div>
+
+                <!-- Master Meter Panel -->
+                <div class="master-meter-panel">
+                    <span class="meter-label">MASTER</span>
+                    <div class="meter-bar">
+                        <div class="meter-fill"></div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Sidebar - Effects & Mixer -->
+            <aside class="right-sidebar">
+                <div class="effects-tabs">
+                    <button class="effects-tab active">Effects</button>
+                    <button class="effects-tab">Mixer</button>
+                </div>
+
+                <!-- Effects Content -->
+                <div class="effects-content">
+                    <!-- Recording Toggle -->
+                    <div class="effect-group recording-toggle">
+                        <div class="effect-title">🎚️ Recording Mode</div>
+                        <label class="toggle-label">
+                            <input type="checkbox" id="recordingEffectsToggle">
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-text">Apply Effects Live</span>
+                        </label>
+                        <div class="effect-status">Effects disabled - Recording clean audio</div>
+                    </div>
+
+                    <!-- Equalizer -->
+                    <div class="effect-group">
+                        <div class="effect-title">🎚️ Equalizer</div>
+                        <div class="eq-controls">
+                            <div class="eq-band">
+                                <label>Low<br>100Hz</label>
+                                <input type="range" id="eqLow" min="-12" max="12" value="0" step="0.1" orient="vertical">
+                                <span id="eqLowValue">0 dB</span>
+                            </div>
+                            <div class="eq-band">
+                                <label>Mid<br>1kHz</label>
+                                <input type="range" id="eqMid" min="-12" max="12" value="0" step="0.1" orient="vertical">
+                                <span id="eqMidValue">0 dB</span>
+                            </div>
+                            <div class="eq-band">
+                                <label>High<br>8kHz</label>
+                                <input type="range" id="eqHigh" min="-12" max="12" value="0" step="0.1" orient="vertical">
+                                <span id="eqHighValue">0 dB</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Compressor -->
+                    <div class="effect-group">
+                        <div class="effect-title">🎛️ Compressor</div>
+                        <div class="param-control">
+                            <label>Threshold <span class="param-value" id="compThresholdValue">-24 dB</span></label>
+                            <input type="range" id="compThreshold" min="-60" max="0" value="-24">
+                        </div>
+                        <div class="param-control">
+                            <label>Ratio <span class="param-value" id="compRatioValue">4:1</span></label>
+                            <input type="range" id="compRatio" min="1" max="20" value="4" step="0.1">
+                        </div>
+                    </div>
+
+                    <!-- Reverb -->
+                    <div class="effect-group">
+                        <div class="effect-title">🌊 Reverb</div>
+                        <div class="param-control">
+                            <label>Decay <span class="param-value" id="reverbDecayValue">1.5 s</span></label>
+                            <input type="range" id="reverbDecay" min="0.1" max="10" value="1.5" step="0.1">
+                        </div>
+                        <div class="param-control">
+                            <label>Wet/Dry <span class="param-value" id="reverbWetValue">20%</span></label>
+                            <input type="range" id="reverbWet" min="0" max="100" value="20">
+                        </div>
+                    </div>
+
+                    <!-- Auto-Tune -->
+                    <div class="effect-group autotune-group">
+                        <div class="effect-title">🎵 Auto-Tune</div>
+                        <div class="param-control">
+                            <label>Intensity <span class="param-value" id="autotuneIntensityValue">0%</span></label>
+                            <input type="range" id="autotuneIntensity" min="0" max="100" value="0">
+                        </div>
+                        <div class="param-control">
+                            <label>Pitch Shift <span class="param-value" id="pitchShiftValue">0 semitones</span></label>
+                            <input type="range" id="pitchShift" min="-12" max="12" value="0" step="0.1">
+                        </div>
+                    </div>
+
+                    <!-- Export -->
+                    <button class="export-btn">💾 Export Mix</button>
+                </div>
+
+                <!-- Mixer Content -->
+                <div class="mixer-content" style="display: none;">
+                    <div class="mixer-channels">
+                        <div class="mixer-channel">
+                            <span class="channel-label">VOICE</span>
+                            <div class="channel-meter"></div>
+                            <input type="range" class="channel-fader" min="0" max="100" value="80" orient="vertical">
+                        </div>
+                        <div class="mixer-channel">
+                            <span class="channel-label">INST</span>
+                            <div class="channel-meter"></div>
+                            <input type="range" class="channel-fader" min="0" max="100" value="70" orient="vertical">
+                        </div>
+                        <div class="mixer-channel">
+                            <span class="channel-label">MASTER</span>
+                            <div class="channel-meter"></div>
+                            <input type="range" class="channel-fader" min="0" max="100" value="80" orient="vertical">
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Add Track Menu Modal -->
+    <div id="addTrackMenu" class="modal" style="display: none;">
+        <div class="modal-content add-track-modal">
+            <div class="modal-header">
+                <h3>Add New Track</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="track-option" data-type="voice-recorder">
+                    <div class="track-option-icon">🎤</div>
+                    <div class="track-option-info">
+                        <h4>Voice Recorder</h4>
+                        <p>Record your voice with effects</p>
+                    </div>
+                </div>
+                <div class="track-option" data-type="audio-track">
+                    <div class="track-option-icon">🎵</div>
+                    <div class="track-option-info">
+                        <h4>Add Track</h4>
+                        <p>Import audio from your device</p>
+                    </div>
+                </div>
+                <div class="track-option" data-type="sampler">
+                    <div class="track-option-icon">🎹</div>
+                    <div class="track-option-info">
+                        <h4>Add Sampler</h4>
+                        <p>Create beats with sample pads</p>
+                    </div>
+                </div>
+                <div class="track-option" data-type="v-instrumental">
+                    <div class="track-option-icon">🎸</div>
+                    <div class="track-option-info">
+                        <h4>V-Instrumental</h4>
+                        <p>Virtual instrument synthesizer</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Voice Recorder Modal -->
+    <div id="voiceRecorderModal" class="modal" style="display: none;">
+        <div class="modal-content recorder-modal">
+            <div class="modal-header">
+                <h3>🎤 Voice Recorder</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="recorder-visualizer">
+                    <canvas id="recorderCanvas" width="400" height="150"></canvas>
+                </div>
+                <div class="recorder-controls">
+                    <button class="recorder-btn" id="startVoiceRecord">
+                        <span class="record-circle"></span>
+                        Start Recording
+                    </button>
+                    <button class="recorder-btn stop-recorder" id="stopVoiceRecord" disabled>
+                        <span class="stop-square"></span>
+                        Stop Recording
+                    </button>
+                </div>
+                <div class="recorder-timer">00:00:00</div>
+                <div class="recorder-status">Ready to record</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sampler Modal -->
+    <div id="samplerModal" class="modal" style="display: none;">
+        <div class="modal-content sampler-modal">
+            <div class="modal-header">
+                <h3>🎹 Sample Pads</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="sampler-grid">
+                    <div class="sample-pad" data-pad="1">
+                        <div class="pad-number">1</div>
+                        <div class="pad-label">Kick</div>
+                        <button class="pad-record-btn">📁</button>
+                    </div>
+                    <div class="sample-pad" data-pad="2">
+                        <div class="pad-number">2</div>
+                        <div class="pad-label">Snare</div>
+                        <button class="pad-record-btn">📁</button>
+                    </div>
+                    <div class="sample-pad" data-pad="3">
+                        <div class="pad-number">3</div>
+                        <div class="pad-label">HiHat</div>
+                        <button class="pad-record-btn">📁</button>
+                    </div>
+                    <div class="sample-pad" data-pad="4">
+                        <div class="pad-number">4</div>
+                        <div class="pad-label">Clap</div>
+                        <button class="pad-record-btn">📁</button>
+                    </div>
+                    <div class="sample-pad" data-pad="5">
+                        <div class="pad-number">5</div>
+                        <div class="pad-label">Bass</div>
+                        <button class="pad-record-btn">📁</button>
+                    </div>
+                    <div class="sample-pad" data-pad="6">
+                        <div class="pad-number">6</div>
+                        <div class="pad-label">FX</div>
+                        <button class="pad-record-btn">📁</button>
+                    </div>
+                </div>
+                <div class="sampler-info">
+                    Click pads to play • Long press to record • Click 📁 to load files
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div id="contextMenu" class="context-menu" style="display: none;">
+        <div class="context-menu-item" data-action="delete">🗑️ Delete Track</div>
+        <div class="context-menu-item" data-action="slice">✂️ Slice at Position</div>
+        <div class="context-menu-item" data-action="fade">📉 Add Fade</div>
+    </div>
+
+    <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="studio.js"></script>
-    
-    <style>
-        /* Toggle Switch Styles */
-        #effectsToggle:checked + span {
-            background-color: #4ecdc4 !important;
-        }
-        
-        #effectsToggle:checked + span + span {
-            transform: translateX(24px);
-        }
-        
-        .effects-panel {
-            transition: opacity 0.3s ease;
-        }
-    </style>
 </body>
 </html>
