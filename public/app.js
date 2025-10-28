@@ -1460,6 +1460,12 @@ function setupKaraokeModal() {
     stopRecordBtn.addEventListener('click', stopRecording);
     sendRecordingBtn.addEventListener('click', sendKaraokeRecording);
 
+    // Add download button listener
+    const downloadRecordingBtn = document.getElementById('downloadRecordingBtn');
+    if (downloadRecordingBtn) {
+        downloadRecordingBtn.addEventListener('click', downloadKaraokeRecording);
+    }
+
     console.log('✅ Karaoke modal setup complete');
 }
 
@@ -1509,24 +1515,16 @@ function closeKaraokeModal() {
     }
     
     cleanupStreams();
-    resetKaraokeUI();
-    
-    console.log('✅ Karaoke modal fully closed');
-}
-
-function resetKaraokeUI() {
-    youtubeResults.style.display = 'none';
-    youtubeResults.innerHTML = '';
-    
-    karaokePlayerSection.style.display = 'none';
-    recordedAudioPreview.style.display = 'none';
-    recordingIndicator.style.display = 'none';
-    
-    startRecordBtn.style.display = 'inline-flex';
+   startRecordBtn.style.display = 'inline-flex';
     stopRecordBtn.style.display = 'none';
     
-    youtubeSearchInput.value = '';
+    // Hide download button
+    const downloadBtn = document.getElementById('downloadRecordingBtn');
+    if (downloadBtn) {
+        downloadBtn.style.display = 'none';
+    }
     
+    youtubeSearchInput.value = '';
     recordingTimer.textContent = '00:00';
     
     selectedVideoId = null;
@@ -1994,7 +1992,16 @@ async function stopRecording() {
             // Show audio preview
             const audioUrl = URL.createObjectURL(recordedBlob);
             recordedAudio.src = audioUrl;
-            recordedAudioPreview.style.display = 'block';
+           recordedAudioPreview.style.display = 'block';
+            
+            // Enable download button
+            const downloadBtn = document.getElementById('downloadRecordingBtn');
+            if (downloadBtn) {
+                downloadBtn.style.display = 'inline-flex';
+                downloadBtn.disabled = false;
+            }
+            
+            console.log('✅ Recording ready:', (recordedBlob.size / 1024).toFixed(2), 'KB');
             
             console.log('✅ Recording ready:', (recordedBlob.size / 1024).toFixed(2), 'KB');
             
@@ -2033,6 +2040,42 @@ async function stopRecording() {
 // ==========================================
 // WEB FALLBACK RECORDING
 // ==========================================
+// ==========================================
+// handleRecordingStop - Process recorded audio
+// ==========================================
+function handleRecordingStop() {
+    console.log('🎬 Processing recording...');
+    
+    if (audioChunks.length === 0) {
+        console.error('❌ No audio chunks recorded');
+        alert('Recording failed: No audio data captured');
+        cleanupStreams();
+        return;
+    }
+    
+    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+    recordedBlob = audioBlob;
+    
+    const audioUrl = URL.createObjectURL(audioBlob);
+    recordedAudio.src = audioUrl;
+    
+    recordedAudioPreview.style.display = 'block';
+    
+    // Enable download button
+    const downloadBtn = document.getElementById('downloadRecordingBtn');
+    if (downloadBtn) {
+        downloadBtn.style.display = 'inline-flex';
+        downloadBtn.disabled = false;
+    }
+    
+    console.log('✅ Recording ready!', (audioBlob.size / 1024).toFixed(2), 'KB');
+    
+    cleanupStreams();
+}
+
+// ==========================================
+// WEB FALLBACK RECORDING
+// ==========================================
 async function startWebRecording() {
     try {
         console.log('🌐 Starting web microphone recording...');
@@ -2053,7 +2096,9 @@ async function startWebRecording() {
 
         audioChunks = [];
         mediaRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) audioChunks.push(e.data);
+            if (e.data.size > 0) {
+                audioChunks.push(e.data);
+            }
         };
         mediaRecorder.onstop = handleRecordingStop;
         mediaRecorder.start(1000);
@@ -2082,21 +2127,44 @@ async function startWebRecording() {
     }
 }
 
-function handleRecordingStop() {
-    console.log('🎬 Processing recording...');
-    
-    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-    recordedBlob = audioBlob;
-    
-    const audioUrl = URL.createObjectURL(audioBlob);
-    recordedAudio.src = audioUrl;
-    
-    recordedAudioPreview.style.display = 'block';
-    
-    console.log('✅ Recording ready!', (audioBlob.size / 1024).toFixed(2), 'KB');
-    
-    cleanupStreams();
+// ==========================================
+// DOWNLOAD KARAOKE RECORDING
+// ==========================================
+function downloadKaraokeRecording() {
+    if (!recordedBlob) {
+        alert('No recording to download');
+        return;
+    }
+
+    try {
+        const url = URL.createObjectURL(recordedBlob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        
+        // Generate filename with timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        const extension = recordedBlob.type.includes('wav') ? 'wav' : 'webm';
+        a.download = `Karaoke_${timestamp}.${extension}`;
+        
+        document.body.appendChild(a);
+        a.click();
+        
+        // Cleanup
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 100);
+        
+        console.log('✅ Recording downloaded');
+    } catch (error) {
+        console.error('❌ Download error:', error);
+        alert('Failed to download recording');
+    }
 }
+
+// Make function globally accessible
+window.downloadKaraokeRecording = downloadKaraokeRecording;
 
 function cleanupStreams() {
     console.log('🧹 Cleaning up streams...');
@@ -2175,7 +2243,44 @@ async function sendKaraokeRecording() {
 
             console.log('🎤 Sending karaoke:', audioData.size, 'bytes');
 
-            const tempMessage = {
+            function downloadKaraokeRecording() {
+    if (!recordedBlob) {
+        alert('No recording to download');
+        return;
+    }
+
+    try {
+        const url = URL.createObjectURL(recordedBlob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        
+        // Generate filename with timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        const extension = recordedBlob.type.includes('wav') ? 'wav' : 'webm';
+        a.download = `Karaoke_${timestamp}.${extension}`;
+        
+        document.body.appendChild(a);
+        a.click();
+        
+        // Cleanup
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 100);
+        
+        console.log('✅ Recording downloaded');
+    } catch (error) {
+        console.error('❌ Download error:', error);
+        alert('Failed to download recording');
+    }
+}
+
+// Make function globally accessible
+window.downloadKaraokeRecording = downloadKaraokeRecording;
+
+            // Add to messages array
+            const newMessage = {
                 id: 'temp_' + Date.now() + Math.random().toString(36).substr(2, 9),
                 senderId: currentUser.id,
                 receiverId: selectedFriend.id,
@@ -2185,19 +2290,34 @@ async function sendKaraokeRecording() {
                 status: 'sent'
             };
 
-            messages.push(tempMessage);
+            messages.push(newMessage);
             renderMessages();
             scrollToBottom();
 
+            // Send via socket
             socket.emit('send_message', {
                 senderId: currentUser.id,
                 receiverId: selectedFriend.id,
                 content: JSON.stringify(audioData),
                 type: 'audio'
+            }, (response) => {
+                console.log('📬 Karaoke send response:', response);
             });
 
-            closeKaraokeModal();
-            alert('Karaoke recording sent! 🎤');
+            // DON'T close modal - just show success
+            alert('Karaoke recording sent! 🎤\n\nYou can record another or close the modal.');
+            
+            // Reset send button
+            sendRecordingBtn.disabled = false;
+            sendRecordingBtn.innerHTML = `
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                    <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                    <path d="M2 2l7.586 7.586"></path>
+                    <circle cx="11" cy="11" r="2"></circle>
+                </svg>
+                <span>Send to Chat</span>
+            `;
         };
 
         reader.onerror = () => {
@@ -2213,7 +2333,6 @@ async function sendKaraokeRecording() {
         sendRecordingBtn.disabled = false;
     }
 }
-
 // ==========================================
 // ADD THESE LOGOUT FUNCTIONS TO app.js
 // Add after setupKaraokeModal() function
