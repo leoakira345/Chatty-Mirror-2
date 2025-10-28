@@ -496,53 +496,51 @@ app.post('/api/user/init', async (req, res) => {
 app.get('/api/user/:userId', async (req, res) => {
     try {
         let { userId } = req.params;
-        
         userId = userId.trim();
         
         console.log(`🔍 Searching for user: "${userId}"`);
         
+        // Validate format
         if (!/^\d{4}$/.test(userId)) {
-            console.log(`❌ Invalid format: "${userId}"`);
             return res.json({ 
                 success: false, 
                 message: 'User ID must be exactly 4 digits' 
             });
         }
         
+        // Try to read user file
         const user = await readJSON(`user_${userId}.json`);
         
-        if (user) {
-            console.log(`✅ User found: ${userId}`);
-            
-            // Return user data (without password if it exists)
-            const { password, ...safeUser } = user;
-            
-            res.json({
-                success: true,
-                user: {
-                    id: safeUser.id,
-                    username: safeUser.username,
-                    email: safeUser.email || null,
-                    profilePhoto: safeUser.profilePhoto || null,
-                    createdAt: safeUser.createdAt
-                }
-            });
-        } else {
+        if (!user) {
             console.log(`❌ User not found: ${userId}`);
-            res.json({ 
+            return res.json({ 
                 success: false, 
                 message: 'User not found' 
             });
         }
+        
+        console.log(`✅ User found: ${userId}`, user);
+        
+        // Return user (works for both old and new users)
+        res.json({
+            success: true,
+            user: {
+                id: user.id,
+                username: user.username || `User${userId}`,
+                email: user.email || null,
+                profilePhoto: user.profilePhoto || null,
+                createdAt: user.createdAt || Date.now()
+            }
+        });
+        
     } catch (error) {
         console.error('❌ Error getting user:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to get user' 
+            message: 'Server error: ' + error.message
         });
     }
 });
-
 app.post('/api/user/update', async (req, res) => {
     try {
         const { userId, username, profilePhoto } = req.body;
