@@ -685,19 +685,30 @@
                 </div>
 
                 <!-- Recorded Audio Preview -->
-                <div id="recordedAudioPreview" class="recorded-audio-preview" style="display: none;">
-                    <h3 style="margin-bottom: 1rem;">Your Recording</h3>
-                    <audio id="recordedAudio" controls style="width: 100%; margin-bottom: 1rem;"></audio>
-                    <button class="send-recording-btn" id="sendRecordingBtn">
-                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="22" y1="2" x2="11" y2="13"></line>
-                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                        </svg>
-                        <span>Send to Chat</span>
-                    </button>
-                </div>
-            </div>
-        </div>
+<div id="recordedAudioPreview" class="recorded-audio-preview" style="display: none;">
+    <h3 style="margin-bottom: 1rem;">Your Recording</h3>
+    <audio id="recordedAudio" controls style="width: 100%; margin-bottom: 1rem;"></audio>
+    
+    <!-- Buttons Container -->
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+        <button class="download-recording-btn" id="downloadRecordingBtn" style="display: none;">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Download</span>
+        </button>
+        
+        <button class="send-recording-btn" id="sendRecordingBtn">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+            <span>Send to Chat</span>
+        </button>
+    </div>
+</div>
     </div>
 
     <!-- Countdown Overlay -->
