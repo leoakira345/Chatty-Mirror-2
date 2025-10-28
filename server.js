@@ -513,13 +513,18 @@ app.get('/api/user/:userId', async (req, res) => {
         
         if (user) {
             console.log(`✅ User found: ${userId}`);
+            
+            // Return user data (without password if it exists)
+            const { password, ...safeUser } = user;
+            
             res.json({
                 success: true,
                 user: {
-                    id: user.id,
-                    username: user.username,
-                    profilePhoto: user.profilePhoto || null,
-                    createdAt: user.createdAt
+                    id: safeUser.id,
+                    username: safeUser.username,
+                    email: safeUser.email || null,
+                    profilePhoto: safeUser.profilePhoto || null,
+                    createdAt: safeUser.createdAt
                 }
             });
         } else {
@@ -1038,6 +1043,7 @@ app.post('/api/auth/signup', async (req, res) => {
 });
 
 // Login Route
+// Login Route
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { identifier, password } = req.body;
@@ -1082,13 +1088,30 @@ app.post('/api/auth/login', async (req, res) => {
             });
         }
         
-        // Verify password
-        const hashedPassword = hashPassword(password);
-        if (foundUser.password !== hashedPassword) {
-            return res.json({ 
-                success: false, 
-                message: 'Invalid credentials' 
-            });
+        // ✅ CHECK IF LEGACY USER (no password field)
+        if (!foundUser.password) {
+            console.log('⚠️ Legacy user detected:', foundUser.id);
+            
+            // Migrate legacy user by setting password
+            foundUser.password = hashPassword(password);
+            foundUser.email = foundUser.email || `user${foundUser.id}@legacy.local`;
+            
+            const saved = await writeJSON(`user_${foundUser.id}.json`, foundUser);
+            
+            if (saved) {
+                console.log('✅ Legacy user migrated:', foundUser.id);
+            } else {
+                console.error('❌ Failed to migrate user');
+            }
+        } else {
+            // Verify password for regular users
+            const hashedPassword = hashPassword(password);
+            if (foundUser.password !== hashedPassword) {
+                return res.json({ 
+                    success: false, 
+                    message: 'Invalid credentials' 
+                });
+            }
         }
         
         console.log(`✅ User logged in: ${foundUser.id} (${foundUser.username})`);
@@ -1158,6 +1181,51 @@ app.post('/api/auth/logout', async (req, res) => {
     } catch (error) {
         console.error('❌ Logout error:', error);
         res.json({ success: false, message: 'Logout failed' });
+    }
+});
+
+// Migrate all legacy users (call this once after deployment)
+app.post('/api/admin/migrate-legacy-users', async (req, res) => {
+    try {
+        const files = await fs.readdir(DATA_DIR);
+        const userFiles = files.filter(f => f.startsWith('user_') && f.endsWith('.json'));
+        
+        let migratedCount = 0;
+        let alreadyMigratedCount = 0;
+        
+        for (const file of userFiles) {
+            const userData = await readJSON(file);
+            
+            if (userData && !userData.password) {
+                // Legacy user - add default password and email
+                userData.password = hashPassword('default123'); // Default password
+                userData.email = userData.email || `user${userData.id}@legacy.local`;
+                
+                const saved = await writeJSON(file, userData);
+                
+                if (saved) {
+                    migratedCount++;
+                    console.log(`✅ Migrated user: ${userData.id}`);
+                }
+            } else if (userData && userData.password) {
+                alreadyMigratedCount++;
+            }
+        }
+        
+        res.json({
+            success: true,
+            message: 'Migration complete',
+            migrated: migratedCount,
+            alreadyMigrated: alreadyMigratedCount,
+            total: userFiles.length
+        });
+        
+    } catch (error) {
+        console.error('❌ Migration error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Migration failed: ' + error.message
+        });
     }
 });
 startServer();
