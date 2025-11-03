@@ -1317,3 +1317,511 @@ input[type="range"]::-moz-range-thumb:hover {
 .track-item:hover .volume-meter-fill {
     box-shadow: 0 0 15px rgba(102, 126, 234, 0.6);
 }
+
+/* ============================================
+   RESPONSIVE DESIGN - BANDLAB STYLE
+   Mobile-First Approach
+   ============================================ */
+
+/* Mobile Drawer Toggle Button */
+.mobile-drawer-toggle {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    border: none;
+    color: #fff;
+    font-size: 1.5em;
+    cursor: pointer;
+    z-index: 999;
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+    transition: all 0.3s;
+}
+
+.mobile-drawer-toggle:active {
+    transform: scale(0.9);
+}
+
+/* Mobile Bottom Controls */
+.mobile-bottom-bar {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(180deg, #1e1e1e 0%, #2a2a2a 100%);
+    border-top: 1px solid rgba(102, 126, 234, 0.3);
+    padding: 12px;
+    z-index: 100;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+}
+
+.mobile-transport {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+.mobile-transport .control-btn {
+    width: 50px;
+    height: 50px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Tablet Adjustments (768px - 1200px) */
+@media (max-width: 1200px) {
+    .left-sidebar {
+        width: 240px;
+    }
+    
+    .right-sidebar {
+        width: 280px;
+    }
+    
+    .top-bar {
+        padding: 15px 20px;
+    }
+    
+    .logo-section h1 {
+        font-size: 1.5em;
+    }
+    
+    .control-btn {
+        padding: 10px 15px;
+        font-size: 1.1em;
+    }
+}
+
+/* Mobile Landscape & Small Tablets (481px - 768px) */
+@media (max-width: 768px) {
+    body {
+        overflow-x: hidden;
+    }
+    
+    /* Top Bar - Compact Mobile Layout */
+    .top-bar {
+        flex-direction: column;
+        gap: 12px;
+        padding: 12px 15px;
+        position: relative;
+    }
+    
+    .logo-section h1 {
+        font-size: 1.3em;
+        text-align: center;
+    }
+    
+    .transport-controls {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+    }
+    
+    .control-btn {
+        padding: 10px 14px;
+        font-size: 1.1em;
+        flex: 0 0 auto;
+    }
+    
+    .tempo-section {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 12px;
+        width: 100%;
+        padding: 8px 15px;
+    }
+    
+    .tempo-section label {
+        font-size: 0.9em;
+    }
+    
+    .tempo-section input[type="number"] {
+        width: 60px;
+        padding: 6px 10px;
+    }
+    
+    #timeDisplay {
+        font-size: 1em;
+    }
+    
+    /* Main Content - Stack Vertically */
+    .main-content {
+        flex-direction: column;
+        height: calc(100vh - 200px); /* Account for top and bottom bars */
+    }
+    
+    /* Hide Sidebars on Mobile by Default */
+    .left-sidebar,
+    .right-sidebar {
+        position: fixed;
+        top: 0;
+        height: 100vh;
+        z-index: 998;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        width: 85vw;
+        max-width: 320px;
+    }
+    
+    .left-sidebar {
+        left: 0;
+        box-shadow: 4px 0 30px rgba(0,0,0,0.5);
+    }
+    
+    .right-sidebar {
+        right: 0;
+        left: auto;
+        transform: translateX(100%);
+        box-shadow: -4px 0 30px rgba(0,0,0,0.5);
+    }
+    
+    /* Active State for Sidebars */
+    .left-sidebar.active {
+        transform: translateX(0);
+    }
+    
+    .right-sidebar.active {
+        transform: translateX(0);
+    }
+    
+    /* Overlay for Sidebars */
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.7);
+        z-index: 997;
+        backdrop-filter: blur(5px);
+    }
+    
+    .sidebar-overlay.active {
+        display: block;
+    }
+    
+    /* Center Area - Full Width on Mobile */
+.center-area {
+    flex: 1;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+    padding-bottom: 100px; /* More space for bottom bar */
+    height: calc(100vh - 180px); /* Top bar + bottom bar */
+}
+    
+    /* Timeline - Compact */
+    .timeline-container {
+        height: 40px;
+    }
+    
+    #timelineCanvas {
+        height: 40px;
+    }
+    
+    /* Tracks Display - Optimized for Mobile */
+    .tracks-display {
+        padding: 15px 10px;
+    }
+    
+    .track-display {
+        padding: 12px;
+        margin-bottom: 12px;
+        min-height: 80px;
+    }
+    
+    .waveform-canvas {
+        height: 60px;
+    }
+    
+    /* Track Items - Mobile Optimized */
+    .track-item {
+        padding: 15px;
+        margin-bottom: 12px;
+    }
+    
+    .track-name {
+        font-size: 1em;
+    }
+    
+    .track-btn {
+        padding: 8px 12px;
+        font-size: 1em;
+    }
+    
+    .add-track-btn {
+        padding: 14px;
+        font-size: 1em;
+        margin-bottom: 20px;
+    }
+    
+    /* Volume Control - Simplified */
+    .volume-control {
+        padding: 12px;
+        margin-top: 12px;
+    }
+    
+    .volume-header {
+        margin-bottom: 10px;
+    }
+    
+    .volume-label {
+        font-size: 0.8em;
+    }
+    
+    .volume-display {
+        font-size: 0.85em;
+        padding: 3px 8px;
+    }
+    
+    .volume-slider-container {
+        gap: 10px;
+    }
+    
+    .volume-icon-min,
+    .volume-icon-max {
+        font-size: 1em;
+    }
+    
+    /* Effects Panel - Mobile Layout */
+    .effect-section {
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+    
+    .effect-section h3 {
+        font-size: 1em;
+        margin-bottom: 12px;
+    }
+    
+    .effect-section label {
+        font-size: 0.85em;
+        margin: 10px 0;
+    }
+    
+    .eq-controls {
+        gap: 10px;
+    }
+    
+    /* Lyrics Panel - Full Height */
+    #lyricsText {
+        height: calc(100vh - 250px);
+        padding: 15px;
+        font-size: 0.95em;
+    }
+    
+    /* Modal - Full Screen on Mobile */
+    .modal-content {
+        margin: 5% auto;
+        padding: 25px;
+        width: 90%;
+        max-width: 400px;
+        border-radius: 15px;
+    }
+    
+    .modal-content h2 {
+        font-size: 1.5em;
+        margin-bottom: 20px;
+    }
+    
+    .track-options {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .track-option-btn {
+        padding: 25px 15px;
+    }
+    
+    .track-option-btn .icon {
+        font-size: 2em;
+    }
+    
+    /* Show Mobile Controls */
+    .mobile-drawer-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .mobile-bottom-bar {
+        display: block;
+    }
+    
+    /* Color Toolbar - Mobile */
+    .color-toolbar {
+        justify-content: flex-start;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    
+    .color-btn {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .format-toolbar {
+        gap: 6px;
+    }
+    
+    .format-btn {
+        padding: 6px 12px;
+        font-size: 0.85em;
+    }
+    
+    /* Sidebar Tabs - Compact */
+    .tab-btn {
+        padding: 15px;
+        font-size: 0.95em;
+    }
+    
+    /* Scrollbar - Thinner on Mobile */
+    ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+}
+
+/* Small Mobile Devices (320px - 480px) */
+@media (max-width: 480px) {
+    .logo-section h1 {
+        font-size: 1.1em;
+    }
+    
+    .control-btn {
+        padding: 8px 12px;
+        font-size: 1em;
+    }
+    
+    .tempo-section {
+        font-size: 0.85em;
+    }
+    
+    .tempo-section input[type="number"] {
+        width: 50px;
+    }
+    
+    #timeDisplay {
+        font-size: 0.9em;
+    }
+    
+    .left-sidebar,
+    .right-sidebar {
+        width: 90vw;
+        max-width: none;
+    }
+    
+    .track-item {
+        padding: 12px;
+    }
+    
+    .volume-control {
+        padding: 10px;
+    }
+    
+    .effect-section {
+        padding: 12px;
+    }
+    
+    .waveform-canvas {
+        height: 50px;
+    }
+    
+    .modal-content {
+        padding: 20px;
+        width: 95%;
+    }
+    
+    .track-option-btn {
+        padding: 20px 12px;
+    }
+    
+    .track-option-btn .icon {
+        font-size: 1.8em;
+    }
+    
+    .mobile-drawer-toggle {
+        width: 55px;
+        height: 55px;
+        font-size: 1.3em;
+        bottom: 15px;
+        right: 15px;
+    }
+    
+    .mobile-transport .control-btn {
+        width: 45px;
+        height: 45px;
+        font-size: 1em;
+    }
+}
+
+/* Landscape Mode Optimization */
+@media (max-height: 500px) and (orientation: landscape) {
+    .top-bar {
+        padding: 8px 15px;
+    }
+    
+    .logo-section h1 {
+        font-size: 1em;
+    }
+    
+    .control-btn {
+        padding: 6px 10px;
+        font-size: 0.9em;
+    }
+    
+    .timeline-container {
+        height: 35px;
+    }
+    
+    .tracks-display {
+        padding: 10px;
+    }
+    
+    .track-display {
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+    
+    .waveform-canvas {
+        height: 45px;
+    }
+}
+
+/* Desktop HD (1920px+) */
+@media (min-width: 1920px) {
+    .left-sidebar {
+        width: 320px;
+    }
+    
+    .right-sidebar {
+        width: 360px;
+    }
+    
+    .logo-section h1 {
+        font-size: 2em;
+    }
+    
+    .control-btn {
+        padding: 14px 20px;
+        font-size: 1.4em;
+    }
+    
+    .track-display {
+        padding: 20px;
+    }
+    
+    .waveform-canvas {
+        height: 80px;
+    }
+}
