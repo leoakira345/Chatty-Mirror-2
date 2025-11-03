@@ -3,15 +3,19 @@ const http = require('http');
 const socketIO = require('socket.io');
 const cors = require('cors');
 const fs = require('fs').promises;
-const fsSync = require('fs');
 const path = require('path');
 const axios = require('axios');
+const bcrypt = require('bcrypt');
+const rateLimit = require('express-rate-limit');
+const validator = require('validator');
 
 const app = express();
 const server = http.createServer(app);
+
+// FIXED: Restrict CORS to your actual domain
 const io = socketIO(server, {
     cors: {
-        origin: "*",
+        origin: process.env.CLIENT_URL || "http://localhost:3001",
         methods: ["GET", "POST"],
         credentials: true
     },
@@ -25,25 +29,45 @@ const io = socketIO(server, {
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
 
+// FIXED: Restrict CORS
 app.use(cors({
-    origin: "*",
+    origin: process.env.CLIENT_URL || "http://localhost:3001",
     credentials: true
 }));
+
+// Rate limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.'
+});
+
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5, // Limit each IP to 5 login attempts per 15 minutes
+    message: 'Too many login attempts, please try again later.'
+});
+
+app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(express.static('public'));
 
 const DATA_DIR = path.join(__dirname, 'data');
 const activeUsers = new Map();
-const writeLocks = new Map(); // Track ongoing write operations
-const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || 'AIzaSyC1xGrajAjGg67nL6QjCAJn5ZXSg8mPtTg';
+const writeLocks = new Map();
+
+// FIXED: No hardcoded API key
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+
+// ==========================================
+// UTILITY FUNCTIONS
+// ==========================================
 
 async function ensureDataDirectory() {
     try {
         await fs.mkdir(DATA_DIR, { recursive: true });
         console.log('✅ Data directory ready');
-        
-        // Clean up any orphaned temp files on startup
         await cleanupTempFiles();
     } catch (error) {
         console.error('❌ Error creating data directory:', error);
@@ -62,7 +86,6 @@ async function cleanupTempFiles() {
                 const tempPath = path.join(DATA_DIR, tempFile);
                 try {
                     const stats = await fs.stat(tempPath);
-                    // Delete temp files older than 1 minute
                     if (Date.now() - stats.mtimeMs > 60000) {
                         await fs.unlink(tempPath);
                         console.log(`   Deleted: ${tempFile}`);
@@ -106,29 +129,25 @@ async function readJSON(filename) {
     }
 }
 
-// IMPROVED: Atomic writes with file locking
 async function writeJSON(filename, data) {
     const filePath = path.join(DATA_DIR, filename);
     const tempPath = filePath + '.tmp';
     
-    // Wait if there's already a write operation for this file
     let waitCount = 0;
     while (writeLocks.get(filename)) {
         await new Promise(resolve => setTimeout(resolve, 10));
         waitCount++;
-        if (waitCount > 100) { // 1 second timeout
+        if (waitCount > 100) {
             console.error(`⚠️  Write lock timeout for ${filename}`);
             break;
         }
     }
     
-    // Lock this file for writing
     writeLocks.set(filename, true);
     
     try {
         let jsonString;
         
-        // Step 1: Stringify data
         try {
             jsonString = JSON.stringify(data, null, 2);
         } catch (stringifyError) {
@@ -136,7 +155,6 @@ async function writeJSON(filename, data) {
             return false;
         }
         
-        // Step 2: Validate the JSON string
         try {
             JSON.parse(jsonString);
         } catch (validateError) {
@@ -144,29 +162,23 @@ async function writeJSON(filename, data) {
             return false;
         }
         
-        // Step 3: Write to temporary file first (atomic operation)
         await fs.writeFile(tempPath, jsonString, 'utf8');
         
-        // Step 4: Verify the temporary file is valid
         try {
             const verifyData = await fs.readFile(tempPath, 'utf8');
-            JSON.parse(verifyData); // Will throw if corrupted
+            JSON.parse(verifyData);
         } catch (verifyError) {
             console.error('❌ Temporary file verification failed:', verifyError);
             await fs.unlink(tempPath);
             return false;
         }
         
-        // Step 5: Atomically replace the old file with the new one
-        // This is atomic on most filesystems
         await fs.rename(tempPath, filePath);
-        
         return true;
         
     } catch (error) {
         console.error(`❌ Error writing JSON ${filename}:`, error);
         
-        // Clean up temporary file if it exists
         try {
             await fs.unlink(tempPath);
         } catch (unlinkError) {
@@ -175,7 +187,6 @@ async function writeJSON(filename, data) {
         
         return false;
     } finally {
-        // Always release the lock
         writeLocks.delete(filename);
     }
 }
@@ -211,10 +222,46 @@ async function generateUniqueUserId() {
     return userId;
 }
 
+// FIXED: Secure password hashing with bcrypt
+async function hashPassword(password) {
+    try {
+        const salt = await bcrypt.genSalt(10);
+        return await bcrypt.hash(password, salt);
+    } catch (error) {
+        console.error('❌ Error hashing password:', error);
+        throw new Error('Password hashing failed');
+    }
+}
+
+async function verifyPassword(password, hash) {
+    try {
+        return await bcrypt.compare(password, hash);
+    } catch (error) {
+        console.error('❌ Error verifying password:', error);
+        return false;
+    }
+}
+
+// Input sanitization function
+function sanitizeInput(input) {
+    if (typeof input !== 'string') return input;
+    return validator.escape(input.trim());
+}
+
+// ==========================================
+// SOCKET.IO EVENTS
+// ==========================================
+
 io.on('connection', (socket) => {
     console.log('🔌 New client connected:', socket.id);
 
     socket.on('user_connected', async (userId) => {
+        // Validate userId format
+        if (!/^\d{4}$/.test(userId)) {
+            socket.emit('error', { message: 'Invalid user ID format' });
+            return;
+        }
+
         if (activeUsers.has(userId)) {
             const oldSocketId = activeUsers.get(userId);
             console.log(`🔄 User ${userId} reconnecting, removing old socket ${oldSocketId}`);
@@ -269,8 +316,30 @@ io.on('connection', (socket) => {
         console.log('  - Type:', type);
         
         try {
+            // Validate input
             if (!senderId || !receiverId || !content || !type) {
                 throw new Error('Missing required fields');
+            }
+
+            if (!/^\d{4}$/.test(senderId) || !/^\d{4}$/.test(receiverId)) {
+                throw new Error('Invalid user ID format');
+            }
+
+            // Validate message type
+            const validTypes = ['text', 'image', 'video', 'file', 'audio'];
+            if (!validTypes.includes(type)) {
+                throw new Error('Invalid message type');
+            }
+
+            // Sanitize text content
+            let sanitizedContent = content;
+            if (type === 'text' && typeof content === 'string') {
+                sanitizedContent = sanitizeInput(content);
+                
+                // Check message length
+                if (sanitizedContent.length > 5000) {
+                    throw new Error('Message too long');
+                }
             }
 
             console.log('✅ Validation passed');
@@ -282,7 +351,7 @@ io.on('connection', (socket) => {
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                 senderId: senderId,
                 receiverId: receiverId,
-                content: content,
+                content: sanitizedContent,
                 type: type,
                 timestamp: Date.now(),
                 status: 'sent',
@@ -323,7 +392,6 @@ io.on('connection', (socket) => {
             
             const receiverSocketId = activeUsers.get(receiverId);
             console.log('🔍 Looking for receiver:', receiverId);
-            console.log('🔍 Active users map:', Array.from(activeUsers.keys()));
             console.log('🔍 Receiver socket ID:', receiverSocketId || 'NOT FOUND');
             
             if (receiverSocketId) {
@@ -350,7 +418,6 @@ io.on('connection', (socket) => {
         } catch (error) {
             console.error('❌ ERROR HANDLING MESSAGE:');
             console.error('  -', error.message);
-            console.error('  - Stack:', error.stack);
             socket.emit('message_sent', { 
                 success: false, 
                 error: error.message 
@@ -361,6 +428,11 @@ io.on('connection', (socket) => {
 
     socket.on('typing', (data) => {
         const { senderId, receiverId } = data;
+        
+        if (!/^\d{4}$/.test(senderId) || !/^\d{4}$/.test(receiverId)) {
+            return;
+        }
+        
         const receiverSocketId = activeUsers.get(receiverId);
         if (receiverSocketId) {
             io.to(receiverSocketId).emit('user_typing', { userId: senderId });
@@ -369,6 +441,11 @@ io.on('connection', (socket) => {
 
     socket.on('stop_typing', (data) => {
         const { senderId, receiverId } = data;
+        
+        if (!/^\d{4}$/.test(senderId) || !/^\d{4}$/.test(receiverId)) {
+            return;
+        }
+        
         const receiverSocketId = activeUsers.get(receiverId);
         if (receiverSocketId) {
             io.to(receiverSocketId).emit('user_stop_typing', { userId: senderId });
@@ -379,6 +456,10 @@ io.on('connection', (socket) => {
         const { messageId, userId } = data;
         
         console.log(`👁️  Mark seen request:`, { messageId, userId });
+        
+        if (!/^\d{4}$/.test(userId)) {
+            return;
+        }
         
         try {
             const files = await fs.readdir(DATA_DIR);
@@ -452,13 +533,15 @@ io.on('connection', (socket) => {
     });
 });
 
-// API Routes
+// ==========================================
+// API ROUTES
+// ==========================================
 
 app.get('/', (req, res) => {
     res.json({
         success: true,
         message: 'Chatty Mirror Server is running',
-        version: '2.6-atomic-writes',
+        version: '3.0-secure',
         activeUsers: activeUsers.size,
         features: [
             'Text messaging',
@@ -467,26 +550,33 @@ app.get('/', (req, res) => {
             'File sharing',
             'Audio messages',
             'Karaoke recordings',
-            'Atomic file writes',
-            'Corruption prevention'
+            'Secure authentication',
+            'Rate limiting'
         ]
     });
 });
 
 app.post('/api/user/init', async (req, res) => {
     try {
+        console.log('⚠️ /api/user/init called - creating new user');
+        
         const userId = await generateUniqueUserId();
         const user = {
             id: userId,
             username: `User${userId}`,
+            email: null,
+            password: null,
             profilePhoto: null,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            isLegacy: true
         };
         
         await writeJSON(`user_${userId}.json`, user);
-        console.log(`👤 New user created: ${userId}`);
+        console.log(`👤 New legacy user created: ${userId}`);
         
-        res.json({ success: true, user: user });
+        const { password: _, ...userWithoutPassword } = user;
+        
+        res.json({ success: true, user: userWithoutPassword });
     } catch (error) {
         console.error('❌ Error initializing user:', error);
         res.status(500).json({ success: false, message: 'Failed to initialize user' });
@@ -500,7 +590,6 @@ app.get('/api/user/:userId', async (req, res) => {
         
         console.log(`🔍 Searching for user: "${userId}"`);
         
-        // Validate format
         if (!/^\d{4}$/.test(userId)) {
             return res.json({ 
                 success: false, 
@@ -508,7 +597,6 @@ app.get('/api/user/:userId', async (req, res) => {
             });
         }
         
-        // Try to read user file
         const user = await readJSON(`user_${userId}.json`);
         
         if (!user) {
@@ -519,17 +607,18 @@ app.get('/api/user/:userId', async (req, res) => {
             });
         }
         
-        console.log(`✅ User found: ${userId}`, user);
+        console.log(`✅ User found: ${userId}`);
         
-        // Return user (works for both old and new users)
+        const { password: _, ...userWithoutPassword } = user;
+        
         res.json({
             success: true,
             user: {
-                id: user.id,
-                username: user.username || `User${userId}`,
-                email: user.email || null,
-                profilePhoto: user.profilePhoto || null,
-                createdAt: user.createdAt || Date.now()
+                id: userWithoutPassword.id,
+                username: userWithoutPassword.username || `User${userId}`,
+                email: userWithoutPassword.email || null,
+                profilePhoto: userWithoutPassword.profilePhoto || null,
+                createdAt: userWithoutPassword.createdAt || Date.now()
             }
         });
         
@@ -541,9 +630,10 @@ app.get('/api/user/:userId', async (req, res) => {
         });
     }
 });
+
 app.post('/api/user/update', async (req, res) => {
     try {
-        const { userId, username, profilePhoto } = req.body;
+        let { userId, username, profilePhoto } = req.body;
 
         if (!userId || !/^\d{4}$/.test(userId)) {
             return res.json({ success: false, message: 'Invalid user ID' });
@@ -555,6 +645,8 @@ app.post('/api/user/update', async (req, res) => {
         }
 
         if (username) {
+            username = sanitizeInput(username);
+            
             if (username.length < 2 || username.length > 25) {
                 return res.json({ success: false, message: 'Username must be 2-25 characters' });
             }
@@ -569,7 +661,8 @@ app.post('/api/user/update', async (req, res) => {
         const saved = await writeJSON(`user_${userId}.json`, user);
 
         if (saved) {
-            res.json({ success: true, user: user });
+            const { password: _, ...userWithoutPassword } = user;
+            res.json({ success: true, user: userWithoutPassword });
         } else {
             res.json({ success: false, message: 'Failed to save' });
         }
@@ -582,6 +675,11 @@ app.post('/api/user/update', async (req, res) => {
 app.get('/api/friends/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
+        
+        if (!/^\d{4}$/.test(userId)) {
+            return res.json({ success: false, message: 'Invalid user ID' });
+        }
+        
         const friendsData = await readJSON(`friends_${userId}.json`);
         
         if (!friendsData || !friendsData.friendIds) {
@@ -592,10 +690,11 @@ app.get('/api/friends/:userId', async (req, res) => {
         for (const friendId of friendsData.friendIds) {
             const friend = await readJSON(`user_${friendId}.json`);
             if (friend) {
+                const { password: _, ...friendWithoutPassword } = friend;
                 friends.push({
-                    id: friend.id,
-                    username: friend.username,
-                    profilePhoto: friend.profilePhoto || null,
+                    id: friendWithoutPassword.id,
+                    username: friendWithoutPassword.username,
+                    profilePhoto: friendWithoutPassword.profilePhoto || null,
                     isOnline: activeUsers.has(friendId)
                 });
             }
@@ -616,6 +715,10 @@ app.post('/api/friends/add', async (req, res) => {
         
         if (!userId || !friendId) {
             return res.json({ success: false, message: 'Missing userId or friendId' });
+        }
+        
+        if (!/^\d{4}$/.test(userId) || !/^\d{4}$/.test(friendId)) {
+            return res.json({ success: false, message: 'Invalid user ID format' });
         }
         
         if (userId === friendId) {
@@ -642,8 +745,6 @@ app.post('/api/friends/add', async (req, res) => {
             userFriends.friendIds.push(friendId);
             await writeJSON(`friends_${userId}.json`, userFriends);
             console.log(`✅ Added ${friendId} to ${userId}'s friend list`);
-        } else {
-            console.log(`ℹ️  ${friendId} already in ${userId}'s friend list`);
         }
         
         let friendFriends = await readJSON(`friends_${friendId}.json`) || { friendIds: [] };
@@ -655,44 +756,40 @@ app.post('/api/friends/add', async (req, res) => {
             friendFriends.friendIds.push(userId);
             await writeJSON(`friends_${friendId}.json`, friendFriends);
             console.log(`✅ Added ${userId} to ${friendId}'s friend list`);
-        } else {
-            console.log(`ℹ️  ${userId} already in ${friendId}'s friend list`);
         }
         
         const userSocketId = activeUsers.get(userId);
         const friendSocketId = activeUsers.get(friendId);
         
-        console.log(`🔍 User ${userId} socket: ${userSocketId || 'offline'}`);
-        console.log(`🔍 Friend ${friendId} socket: ${friendSocketId || 'offline'}`);
-        
         if (userSocketId) {
             const userSocket = io.sockets.sockets.get(userSocketId);
             if (userSocket) {
+                const { password: _, ...friendWithoutPassword } = friendUser;
                 userSocket.emit('friend_added', { 
                     friendId: friendId,
-                    friend: friendUser 
+                    friend: friendWithoutPassword 
                 });
-                console.log(`✅ Notified user ${userId} about new friend`);
             }
         }
         
         if (friendSocketId) {
             const friendSocket = io.sockets.sockets.get(friendSocketId);
             if (friendSocket) {
+                const { password: _, ...userWithoutPassword } = user;
                 friendSocket.emit('friend_added', { 
                     friendId: userId,
-                    friend: user 
+                    friend: userWithoutPassword 
                 });
-                console.log(`✅ Notified friend ${friendId} about new friend`);
             }
         }
         
         console.log(`✅ Friend relationship established: ${userId} <-> ${friendId}`);
         
+        const { password: _, ...friendWithoutPassword } = friendUser;
         res.json({ 
             success: true, 
             message: 'Friend added successfully',
-            friend: friendUser
+            friend: friendWithoutPassword
         });
     } catch (error) {
         console.error('❌ Error adding friend:', error);
@@ -706,8 +803,12 @@ app.post('/api/friends/add', async (req, res) => {
 app.get('/api/messages/:userId1/:userId2', async (req, res) => {
     try {
         const { userId1, userId2 } = req.params;
-        const chatId = [userId1, userId2].sort().join('_');
         
+        if (!/^\d{4}$/.test(userId1) || !/^\d{4}$/.test(userId2)) {
+            return res.json({ success: false, message: 'Invalid user ID format' });
+        }
+        
+        const chatId = [userId1, userId2].sort().join('_');
         const messagesData = await readJSON(`messages_${chatId}.json`);
         
         console.log(`📬 Loading messages for ${chatId}: ${messagesData?.messages?.length || 0} messages`);
@@ -727,44 +828,20 @@ app.get('/api/health', (req, res) => {
         success: true,
         message: 'Server is running',
         activeUsers: activeUsers.size,
-        activeUsersList: Array.from(activeUsers.keys()),
         writeLocks: writeLocks.size,
         timestamp: Date.now(),
-        version: '2.6-atomic-writes'
+        version: '3.0-secure'
     });
-});
-
-app.post('/api/messages/fix/:chatId', async (req, res) => {
-    try {
-        const { chatId } = req.params;
-        const filename = `messages_${chatId}.json`;
-        
-        const filePath = path.join(DATA_DIR, filename);
-        const data = await fs.readFile(filePath, 'utf8');
-        
-        try {
-            JSON.parse(data);
-            res.json({ success: true, message: 'File is valid' });
-        } catch (parseError) {
-            const backupPath = path.join(DATA_DIR, `${filename}.backup.${Date.now()}`);
-            await fs.writeFile(backupPath, data, 'utf8');
-            
-            await writeJSON(filename, { messages: [] });
-            
-            res.json({ 
-                success: true, 
-                message: 'Corrupted file fixed',
-                backup: backupPath
-            });
-        }
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
 });
 
 app.get('/api/karaoke/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
+        
+        if (!/^\d{4}$/.test(userId)) {
+            return res.json({ success: false, message: 'Invalid user ID' });
+        }
+        
         const files = await fs.readdir(DATA_DIR);
         const messageFiles = files.filter(f => f.startsWith('messages_') && f.endsWith('.json'));
         
@@ -807,7 +884,8 @@ app.get('/api/youtube/search', async (req, res) => {
 
         console.log('🔍 YouTube search request:', query);
 
-        if (!YOUTUBE_API_KEY || YOUTUBE_API_KEY === 'YOUR_API_KEY_HERE') {
+        // FIXED: Check if API key exists
+        if (!YOUTUBE_API_KEY) {
             console.error('❌ YouTube API key not configured');
             return res.json({
                 success: false,
@@ -912,43 +990,14 @@ app.get('/api/youtube/search', async (req, res) => {
     }
 });
 
-async function startServer() {
-    await ensureDataDirectory();
-    
-    server.listen(PORT, HOST, () => {
-        console.log('\n' + '='.repeat(60));
-        console.log('  🚀 CHATTY MIRROR SERVER - ATOMIC WRITES VERSION');
-        console.log('='.repeat(60));
-        console.log(`  ✅ Server: http://localhost:${PORT}`);
-        console.log(`  ✅ Version: 2.6 (Atomic Writes)`);
-        console.log(`  🔒 Features: Corruption prevention, file locking`);
-        console.log(`  🎤 Karaoke: Text, Images, Videos, Files, Audio`);
-        console.log('='.repeat(60) + '\n');
-    });
-}
-
 // ==========================================
-// ADD THESE AUTHENTICATION ROUTES TO YOUR server.js
-// Place them after your existing routes, before startServer()
+// AUTHENTICATION ROUTES
 // ==========================================
-
-// Simple password hashing function (for demonstration)
-// In production, use bcrypt or similar library
-function hashPassword(password) {
-    // This is a simple hash - in production use bcrypt!
-    let hash = 0;
-    for (let i = 0; i < password.length; i++) {
-        const char = password.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-    }
-    return Math.abs(hash).toString(36);
-}
 
 // Sign Up Route
-app.post('/api/auth/signup', async (req, res) => {
+app.post('/api/auth/signup', authLimiter, async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        let { name, email, password } = req.body;
         
         console.log('📝 Signup request:', { name, email });
         
@@ -960,6 +1009,10 @@ app.post('/api/auth/signup', async (req, res) => {
             });
         }
         
+        // Sanitize inputs
+        name = sanitizeInput(name);
+        email = email.toLowerCase().trim();
+        
         if (name.length < 2 || name.length > 25) {
             return res.json({ 
                 success: false, 
@@ -967,9 +1020,8 @@ app.post('/api/auth/signup', async (req, res) => {
             });
         }
         
-        // Simple email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
+        // Validate email using validator library
+        if (!validator.isEmail(email)) {
             return res.json({ 
                 success: false, 
                 message: 'Invalid email format' 
@@ -989,7 +1041,7 @@ app.post('/api/auth/signup', async (req, res) => {
         
         for (const file of userFiles) {
             const userData = await readJSON(file);
-            if (userData && userData.email && userData.email.toLowerCase() === email.toLowerCase()) {
+            if (userData && userData.email && userData.email.toLowerCase() === email) {
                 return res.json({ 
                     success: false, 
                     message: 'Email already registered' 
@@ -1000,12 +1052,15 @@ app.post('/api/auth/signup', async (req, res) => {
         // Generate unique user ID
         const userId = await generateUniqueUserId();
         
+        // Hash password with bcrypt
+        const hashedPassword = await hashPassword(password);
+        
         // Create user object
         const user = {
             id: userId,
             username: name,
-            email: email.toLowerCase(),
-            password: hashPassword(password), // Hash the password
+            email: email,
+            password: hashedPassword,
             profilePhoto: null,
             createdAt: Date.now()
         };
@@ -1041,10 +1096,9 @@ app.post('/api/auth/signup', async (req, res) => {
 });
 
 // Login Route
-// Login Route
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
     try {
-        const { identifier, password } = req.body;
+        let { identifier, password } = req.body;
         
         console.log('🔐 Login attempt:', identifier);
         
@@ -1055,7 +1109,9 @@ app.post('/api/auth/login', async (req, res) => {
             });
         }
         
-        // Search for user by ID or username
+        identifier = identifier.trim();
+        
+        // Search for user by ID or username or email
         const files = await fs.readdir(DATA_DIR);
         const userFiles = files.filter(f => f.startsWith('user_') && f.endsWith('.json'));
         
@@ -1069,12 +1125,17 @@ app.post('/api/auth/login', async (req, res) => {
                 foundUser = userData;
             }
         } else {
-            // Search by username
+            // Search by username or email
             for (const file of userFiles) {
                 const userData = await readJSON(file);
-                if (userData && userData.username && userData.username.toLowerCase() === identifier.toLowerCase()) {
-                    foundUser = userData;
-                    break;
+                if (userData) {
+                    const matchUsername = userData.username && userData.username.toLowerCase() === identifier.toLowerCase();
+                    const matchEmail = userData.email && userData.email.toLowerCase() === identifier.toLowerCase();
+                    
+                    if (matchUsername || matchEmail) {
+                        foundUser = userData;
+                        break;
+                    }
                 }
             }
         }
@@ -1082,37 +1143,47 @@ app.post('/api/auth/login', async (req, res) => {
         if (!foundUser) {
             return res.json({ 
                 success: false, 
-                message: 'Invalid credentials' 
+                message: 'User not found. Please check your ID/username/email or sign up.' 
             });
         }
         
-        // ✅ CHECK IF LEGACY USER (no password field)
+        // Handle legacy users (no password field)
         if (!foundUser.password) {
             console.log('⚠️ Legacy user detected:', foundUser.id);
             
-            // Migrate legacy user by setting password
-            foundUser.password = hashPassword(password);
+            // Set password for legacy user
+            const hashedPassword = await hashPassword(password);
+            foundUser.password = hashedPassword;
             foundUser.email = foundUser.email || `user${foundUser.id}@legacy.local`;
+            foundUser.migratedAt = Date.now();
             
             const saved = await writeJSON(`user_${foundUser.id}.json`, foundUser);
             
             if (saved) {
                 console.log('✅ Legacy user migrated:', foundUser.id);
             } else {
-                console.error('❌ Failed to migrate user');
-            }
-        } else {
-            // Verify password for regular users
-            const hashedPassword = hashPassword(password);
-            if (foundUser.password !== hashedPassword) {
                 return res.json({ 
                     success: false, 
-                    message: 'Invalid credentials' 
+                    message: 'Failed to update user. Please try again.' 
+                });
+            }
+        } else {
+            // Verify password for regular users using bcrypt
+            const isPasswordValid = await verifyPassword(password, foundUser.password);
+            
+            if (!isPasswordValid) {
+                return res.json({ 
+                    success: false, 
+                    message: 'Incorrect password' 
                 });
             }
         }
         
         console.log(`✅ User logged in: ${foundUser.id} (${foundUser.username})`);
+        
+        // Update last login time
+        foundUser.lastLogin = Date.now();
+        await writeJSON(`user_${foundUser.id}.json`, foundUser);
         
         // Return user without password
         const { password: _, ...userWithoutPassword } = foundUser;
@@ -1132,21 +1203,23 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// Check if email exists (for validation)
+// Check if email exists
 app.post('/api/auth/check-email', async (req, res) => {
     try {
-        const { email } = req.body;
+        let { email } = req.body;
         
         if (!email) {
             return res.json({ exists: false });
         }
+        
+        email = email.toLowerCase().trim();
         
         const files = await fs.readdir(DATA_DIR);
         const userFiles = files.filter(f => f.startsWith('user_') && f.endsWith('.json'));
         
         for (const file of userFiles) {
             const userData = await readJSON(file);
-            if (userData && userData.email && userData.email.toLowerCase() === email.toLowerCase()) {
+            if (userData && userData.email && userData.email.toLowerCase() === email) {
                 return res.json({ exists: true });
             }
         }
@@ -1159,13 +1232,12 @@ app.post('/api/auth/check-email', async (req, res) => {
     }
 });
 
-// Logout Route (optional - mainly client-side)
+// Logout Route
 app.post('/api/auth/logout', async (req, res) => {
     try {
         const { userId } = req.body;
         
         if (userId && activeUsers.has(userId)) {
-            const socketId = activeUsers.get(userId);
             activeUsers.delete(userId);
             
             // Notify others that user is offline
@@ -1196,7 +1268,8 @@ app.post('/api/admin/migrate-legacy-users', async (req, res) => {
             
             if (userData && !userData.password) {
                 // Legacy user - add default password and email
-                userData.password = hashPassword('default123'); // Default password
+                const hashedPassword = await hashPassword('default123'); // Default password
+                userData.password = hashedPassword;
                 userData.email = userData.email || `user${userData.id}@legacy.local`;
                 
                 const saved = await writeJSON(file, userData);
@@ -1226,4 +1299,30 @@ app.post('/api/admin/migrate-legacy-users', async (req, res) => {
         });
     }
 });
+
+// ==========================================
+// START SERVER
+// ==========================================
+
+async function startServer() {
+    await ensureDataDirectory();
+    
+    server.listen(PORT, HOST, () => {
+        console.log('\n' + '='.repeat(60));
+        console.log('  🚀 CHATTY MIRROR SERVER - SECURE VERSION');
+        console.log('='.repeat(60));
+        console.log(`  ✅ Server: http://localhost:${PORT}`);
+        console.log(`  ✅ Version: 3.0 (Secure)`);
+        console.log(`  🔒 Features: bcrypt, rate limiting, input validation`);
+        console.log(`  🎤 Karaoke: Text, Images, Videos, Files, Audio`);
+        console.log('='.repeat(60));
+        console.log('\n  ⚠️  SECURITY REMINDERS:');
+        console.log('  - Set YOUTUBE_API_KEY in environment variables');
+        console.log('  - Set CLIENT_URL to your frontend domain');
+        console.log('  - Never commit API keys to version control');
+        console.log('  - Consider using a real database for production');
+        console.log('='.repeat(60) + '\n');
+    });
+}
+
 startServer();
