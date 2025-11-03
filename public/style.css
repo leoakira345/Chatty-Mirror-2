@@ -2879,3 +2879,146 @@ body {
 .tab-btn[data-tab="paint"].active {
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
 }
+
+/* AI Chat Popup */
+.ai-popup {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(3px);
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.ai-popup-content {
+  background: #fff;
+  width: 90%;
+  max-width: 600px;
+  height: 80%;
+  border-radius: 12px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #1a73e8;
+  color: #fff;
+  padding: 10px 15px;
+}
+
+.ai-frame {
+  flex: 1;
+  border: none;
+  width: 100%;
+  height: 100%;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+/* ==========================================
+   AI CHAT TAB STYLES
+   ========================================== */
+
+/* AI Tab Container */
+.ai-tab-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.3);
+}
+
+/* AI Iframe Styling */
+.ai-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+}
+
+/* AI Tab Content Full Height */
+#aiTab {
+    height: 100%;
+    padding: 0;
+}
+
+#aiTab .ai-tab-container {
+    padding: 0;
+    margin: 0;
+}
+
+/* Special styling for AI tab button */
+.tab-btn[data-tab="ai"] {
+    position: relative;
+    overflow: hidden;
+}
+
+.tab-btn[data-tab="ai"]::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(102, 126, 234, 0.3),
+        transparent
+    );
+    transition: left 0.5s ease;
+}
+
+.tab-btn[data-tab="ai"]:hover::before {
+    left: 100%;
+}
+
+.tab-btn[data-tab="ai"].active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.tab-btn[data-tab="ai"].active .icon {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .ai-iframe {
+        border-radius: 8px;
+    }
+    
+    .ai-tab-container {
+        border-radius: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .ai-iframe {
+        border-radius: 0;
+    }
+    
+    .ai-tab-container {
+        border-radius: 0;
+    }
+}
