@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Voice Studio Pro</title>
     <link rel="stylesheet" href="studio.css">
 </head>
@@ -16,8 +16,27 @@
         </div>
     </div>
 
+    <!-- Mobile Bottom Bar -->
+    <div class="mobile-bottom-bar">
+        <div class="mobile-transport">
+            <button id="mobilePlayBtn" class="control-btn play" title="Play">▶</button>
+            <button id="mobileStopBtn" class="control-btn" title="Stop">⏹</button>
+            <button id="mobileRecordBtn" class="control-btn record" title="Record">⏺</button>
+            <button id="mobileEffectsToggle" class="control-btn" title="Effects">🎛️</button>
+        </div>
+    </div>
+
     <!-- Main Studio Interface -->
     <div id="studioInterface" style="display: none;">
+
+        <!-- Sidebar Overlay for Mobile -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+        
+        <!-- Mobile Drawer Toggles -->
+        <button class="mobile-drawer-toggle left-toggle" id="mobileTracksToggle" title="Tracks">
+            🎵
+        </button>
+
         <!-- Top Bar -->
         <div class="top-bar">
             <div class="logo-section">
