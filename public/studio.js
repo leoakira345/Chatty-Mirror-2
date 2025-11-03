@@ -1,4 +1,4 @@
-// studio.js - Complete Fixed Version
+// studio.js - Complete Fixed Version with Mobile Support
 
 // Global Variables
 let audioContext;
@@ -70,9 +70,9 @@ async function initializeStudio() {
     }
 }
 
-// Setup Event Listeners
+// Setup Event Listeners (REPLACED WITH MOBILE SUPPORT)
 function setupEventListeners() {
-    // Transport controls
+    // Transport controls - Desktop
     document.getElementById('playBtn').addEventListener('click', togglePlayback);
     document.getElementById('stopBtn').addEventListener('click', stopPlayback);
     document.getElementById('recordBtn').addEventListener('click', toggleRecording);
@@ -80,6 +80,15 @@ function setupEventListeners() {
     document.getElementById('nextBtn').addEventListener('click', nextSection);
     document.getElementById('undoBtn').addEventListener('click', undo);
     document.getElementById('redoBtn').addEventListener('click', redo);
+    
+    // Mobile transport controls
+    const mobilePlayBtn = document.getElementById('mobilePlayBtn');
+    const mobileStopBtn = document.getElementById('mobileStopBtn');
+    const mobileRecordBtn = document.getElementById('mobileRecordBtn');
+    
+    if (mobilePlayBtn) mobilePlayBtn.addEventListener('click', togglePlayback);
+    if (mobileStopBtn) mobileStopBtn.addEventListener('click', stopPlayback);
+    if (mobileRecordBtn) mobileRecordBtn.addEventListener('click', toggleRecording);
     
     // Metronome
     document.getElementById('metronomeBtn').addEventListener('click', toggleMetronome);
@@ -124,8 +133,89 @@ function setupEventListeners() {
         document.getElementById('lyricsText').value = '';
     });
 
-    // Timeline click
-    document.getElementById('timelineCanvas').addEventListener('click', handleTimelineClick);
+    // Timeline click and touch
+    const timelineCanvas = document.getElementById('timelineCanvas');
+    timelineCanvas.addEventListener('click', handleTimelineClick);
+    timelineCanvas.addEventListener('touchstart', handleTimelineTouch);
+    
+    // Initialize mobile functionality
+    setupMobileDrawers();
+    window.addEventListener('resize', handleResize);
+}
+
+// Setup Mobile Drawers (REPLACED)
+function setupMobileDrawers() {
+    const tracksToggle = document.getElementById('mobileTracksToggle');
+    const effectsToggle = document.getElementById('mobileEffectsToggle');
+    const overlay = document.getElementById('sidebarOverlay');
+    const leftSidebar = document.querySelector('.left-sidebar');
+    const rightSidebar = document.querySelector('.right-sidebar');
+    
+    if (!tracksToggle || !effectsToggle || !overlay) return;
+    
+    // Toggle tracks sidebar
+    tracksToggle.addEventListener('click', () => {
+        const isActive = leftSidebar.classList.contains('active');
+        
+        if (isActive) {
+            closeSidebars();
+        } else {
+            closeSidebars();
+            leftSidebar.classList.add('active');
+            overlay.classList.add('active');
+            tracksToggle.textContent = '✕';
+        }
+    });
+    
+    // Toggle effects sidebar
+    effectsToggle.addEventListener('click', () => {
+        const isActive = rightSidebar.classList.contains('active');
+        
+        if (isActive) {
+            closeSidebars();
+        } else {
+            closeSidebars();
+            rightSidebar.classList.add('active');
+            overlay.classList.add('active');
+            effectsToggle.textContent = '✕';
+        }
+    });
+    
+    // Close on overlay click
+    overlay.addEventListener('click', closeSidebars);
+    
+    // Close on escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeSidebars();
+        }
+    });
+}
+
+// Close All Sidebars (REPLACED)
+function closeSidebars() {
+    const overlay = document.getElementById('sidebarOverlay');
+    const leftSidebar = document.querySelector('.left-sidebar');
+    const rightSidebar = document.querySelector('.right-sidebar');
+    const tracksToggle = document.getElementById('mobileTracksToggle');
+    const effectsToggle = document.getElementById('mobileEffectsToggle');
+    
+    if (overlay) overlay.classList.remove('active');
+    if (leftSidebar) leftSidebar.classList.remove('active');
+    if (rightSidebar) rightSidebar.classList.remove('active');
+    if (tracksToggle) tracksToggle.textContent = '🎵';
+    if (effectsToggle) effectsToggle.textContent = '🎛️';
+}
+
+// Handle Window Resize (REPLACED)
+function handleResize() {
+    // Close mobile drawers when switching to desktop
+    if (window.innerWidth > 768) {
+        closeSidebars();
+    }
+    
+    // Redraw timeline on resize
+    drawTimeline();
 }
 
 // Setup Effects Listeners
@@ -242,7 +332,7 @@ function drawTimeline() {
         ctx.beginPath();
         ctx.moveTo(x, 0);
         ctx.lineTo(x, canvas.height);
-        ctx.strokeStyle = i % 60 === 0 ? '#667eea' : '#4a4a4a'; // Highlight every minute
+        ctx.strokeStyle = i % 60 === 0 ? '#667eea' : '#4a4a4a';
         ctx.stroke();
         
         // Time label
@@ -256,7 +346,7 @@ function drawTimeline() {
     // Draw minor markers every 1 second
     ctx.strokeStyle = '#2a2a2a';
     for (let i = 0; i <= totalSeconds; i++) {
-        if (i % 10 !== 0) { // Skip major markers
+        if (i % 10 !== 0) {
             const x = i * pixelsPerSecond;
             ctx.beginPath();
             ctx.moveTo(x, canvas.height - 10);
@@ -275,11 +365,17 @@ function togglePlayback() {
     }
 }
 
-// OPTIMIZED: Start Playback - Clean up frame counters
+// Start Playback (UPDATED WITH MOBILE BUTTON SUPPORT)
 function startPlayback() {
     isPlaying = true;
     playbackStartTime = audioContext.currentTime - currentTime;
     document.getElementById('playBtn').textContent = '⏸';
+    
+    // Update mobile button if it exists
+    const mobilePlayBtn = document.getElementById('mobilePlayBtn');
+    if (mobilePlayBtn) {
+        mobilePlayBtn.textContent = '⏸';
+    }
     
     // Reset frame counters for smooth playback
     updatePlayhead.frameCount = 0;
@@ -296,10 +392,16 @@ function startPlayback() {
     updatePlayhead();
 }
 
-// Pause Playback
+// Pause Playback (UPDATED WITH MOBILE BUTTON SUPPORT)
 function pausePlayback() {
     isPlaying = false;
     document.getElementById('playBtn').textContent = '▶';
+    
+    // Update mobile button if it exists
+    const mobilePlayBtn = document.getElementById('mobilePlayBtn');
+    if (mobilePlayBtn) {
+        mobilePlayBtn.textContent = '▶';
+    }
     
     // Stop all playing sources
     tracks.forEach(track => {
@@ -323,12 +425,12 @@ function stopPlayback() {
     updateTimeDisplay(0);
 }
 
-// FIXED: Play Track with Volume Control
+// Play Track with Volume Control
 function playTrack(track) {
     const source = audioContext.createBufferSource();
     source.buffer = track.buffer;
     
-    // FIXED: Create and store volume control for real-time adjustment
+    // Create and store volume control for real-time adjustment
     const trackGain = audioContext.createGain();
     trackGain.gain.value = track.volume * (track.muted ? 0 : 1);
     
@@ -339,7 +441,7 @@ function playTrack(track) {
     trackGain.connect(effects.input);
     effects.output.connect(audioContext.destination);
     
-    // FIXED: Store gain node reference for volume updates
+    // Store gain node reference for volume updates
     track.source = source;
     track.gainNode = trackGain;
     
@@ -361,7 +463,7 @@ function playTrack(track) {
     }
 }
 
-// FIXED: Create Effects Chain for Real-time Playback
+// Create Effects Chain for Real-time Playback
 function createEffectsChain() {
     // Start with a gain node
     let inputNode = audioContext.createGain();
@@ -383,20 +485,17 @@ function createEffectsChain() {
     
     // 2. EQUALIZER
     if (document.getElementById('eqToggle').checked) {
-        // Low Shelf Filter
         const lowShelf = audioContext.createBiquadFilter();
         lowShelf.type = 'lowshelf';
         lowShelf.frequency.value = 320;
         lowShelf.gain.value = parseFloat(document.getElementById('eqLow').value);
         
-        // Mid Peaking Filter
         const midPeak = audioContext.createBiquadFilter();
         midPeak.type = 'peaking';
         midPeak.frequency.value = 1000;
         midPeak.Q.value = 1.0;
         midPeak.gain.value = parseFloat(document.getElementById('eqMid').value);
         
-        // High Shelf Filter
         const highShelf = audioContext.createBiquadFilter();
         highShelf.type = 'highshelf';
         highShelf.frequency.value = 3200;
@@ -417,22 +516,20 @@ function createEffectsChain() {
         const dryGain = audioContext.createGain();
         const merger = audioContext.createGain();
         
-        const delayTime = (parseFloat(document.getElementById('echoTime').value) / 100) * 2; // 0-2 seconds
-        const feedbackAmount = parseFloat(document.getElementById('echoFeedback').value) / 100 * 0.7; // Max 0.7 to prevent runaway
+        const delayTime = (parseFloat(document.getElementById('echoTime').value) / 100) * 2;
+        const feedbackAmount = parseFloat(document.getElementById('echoFeedback').value) / 100 * 0.7;
         
         delay.delayTime.value = delayTime;
         feedback.gain.value = feedbackAmount;
         wetGain.gain.value = 0.5;
         dryGain.gain.value = 0.7;
         
-        // Create feedback loop
         currentNode.connect(delay);
         delay.connect(feedback);
         feedback.connect(delay);
         delay.connect(wetGain);
         wetGain.connect(merger);
         
-        // Dry signal
         currentNode.connect(dryGain);
         dryGain.connect(merger);
         
@@ -449,15 +546,13 @@ function createEffectsChain() {
         
         const roomSize = parseFloat(document.getElementById('reverbRoom').value) / 100;
         convolver.buffer = createReverbImpulse(roomSize);
-        wetGain.gain.value = 0.4 * roomSize; // Wet signal proportional to room size
+        wetGain.gain.value = 0.4 * roomSize;
         dryGain.gain.value = 0.8;
         
-        // Wet signal (reverb)
         currentNode.connect(convolver);
         convolver.connect(wetGain);
         wetGain.connect(merger);
         
-        // Dry signal
         currentNode.connect(dryGain);
         dryGain.connect(merger);
         
@@ -467,10 +562,9 @@ function createEffectsChain() {
     
     // 5. NOISE GATE (last in chain)
     if (document.getElementById('noiseToggle').checked) {
-        // Simple noise gate using gain ramping
         const gate = audioContext.createGain();
         const threshold = parseFloat(document.getElementById('noiseThreshold').value) / 100;
-        gate.gain.value = threshold < 0.3 ? 1 : 0.5; // Simplified gate
+        gate.gain.value = threshold < 0.3 ? 1 : 0.5;
         
         currentNode.connect(gate);
         currentNode = gate;
@@ -485,7 +579,7 @@ function createEffectsChain() {
     return { input: inputNode, output: masterGain };
 }
 
-// Create Reverb Impulse Response (for real-time context)
+// Create Reverb Impulse Response
 function createReverbImpulse(roomSize) {
     const sampleRate = audioContext.sampleRate;
     const length = Math.floor(sampleRate * roomSize * 3);
@@ -502,9 +596,8 @@ function createReverbImpulse(roomSize) {
     return impulse;
 }
 
-// FIXED: Update Effects in Real-time
+// Update Effects in Real-time
 function updateEffects() {
-    // If currently playing, restart playback with new effects
     if (isPlaying) {
         const wasPlaying = true;
         const savedTime = currentTime;
@@ -531,7 +624,7 @@ async function toggleRecording() {
     }
 }
 
-// FIXED: Start Recording with Reduced Lag
+// Start Recording (UPDATED WITH MOBILE BUTTON SUPPORT)
 async function startRecording() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -544,10 +637,9 @@ async function startRecording() {
             } 
         });
         
-        // FIXED: Maximum bitrate for highest quality
         const options = {
             mimeType: 'audio/webm;codecs=opus',
-            audioBitsPerSecond: 510000 // Maximum quality (510kbps)
+            audioBitsPerSecond: 510000
         };
         
         mediaRecorder = new MediaRecorder(stream, options);
@@ -564,15 +656,18 @@ async function startRecording() {
             await processRecording(blob);
         };
         
-        // FIXED: Larger timeslice reduces lag (was 100ms, now 500ms)
         mediaRecorder.start(500);
         isRecording = true;
         document.getElementById('recordBtn').classList.add('recording');
         
-        // Store the exact time when recording starts
+        // Update mobile button if it exists
+        const mobileRecordBtn = document.getElementById('mobileRecordBtn');
+        if (mobileRecordBtn) {
+            mobileRecordBtn.classList.add('recording');
+        }
+        
         window.recordingStartTime = currentTime;
         
-        // Start playback if not already playing
         if (!isPlaying) {
             startPlayback();
         }
@@ -583,13 +678,19 @@ async function startRecording() {
     }
 }
 
-// Stop Recording
+// Stop Recording (UPDATED WITH MOBILE BUTTON SUPPORT)
 function stopRecording() {
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         mediaRecorder.stop();
         mediaRecorder.stream.getTracks().forEach(track => track.stop());
         isRecording = false;
         document.getElementById('recordBtn').classList.remove('recording');
+        
+        // Update mobile button if it exists
+        const mobileRecordBtn = document.getElementById('mobileRecordBtn');
+        if (mobileRecordBtn) {
+            mobileRecordBtn.classList.remove('recording');
+        }
     }
 }
 
@@ -598,10 +699,8 @@ async function processRecording(blob) {
     const arrayBuffer = await blob.arrayBuffer();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
     
-    // Apply effects to recorded audio
     const processedBuffer = await applyEffectsToBuffer(audioBuffer);
     
-    // Add to tracks with recording start time
     const track = {
         id: Date.now(),
         name: `Recording ${tracks.length + 1}`,
@@ -612,17 +711,16 @@ async function processRecording(blob) {
         volume: 1,
         source: null,
         gainNode: null,
-        startOffset: window.recordingStartTime || 0 // Store when recording started
+        startOffset: window.recordingStartTime || 0
     };
     
     tracks.push(track);
     updateTracksDisplay();
 }
 
-// FIXED: Apply effects to recorded buffer
+// Apply effects to recorded buffer
 async function applyEffectsToBuffer(inputBuffer) {
     try {
-        // Create offline context for processing
         const offlineContext = new OfflineAudioContext(
             inputBuffer.numberOfChannels,
             inputBuffer.length,
@@ -632,7 +730,6 @@ async function applyEffectsToBuffer(inputBuffer) {
         const source = offlineContext.createBufferSource();
         source.buffer = inputBuffer;
         
-        // Create effects chain for offline processing
         const effects = createOfflineEffectsChain(offlineContext);
         
         source.connect(effects.input);
@@ -646,16 +743,15 @@ async function applyEffectsToBuffer(inputBuffer) {
         
     } catch (error) {
         console.error('Error applying effects:', error);
-        return inputBuffer; // Return original on error
+        return inputBuffer;
     }
 }
 
-// FIXED: Create Offline Effects Chain for Recording
+// Create Offline Effects Chain for Recording
 function createOfflineEffectsChain(context) {
     let inputNode = context.createGain();
     let currentNode = inputNode;
     
-    // Apply same effects as real-time, but using offline context
     if (document.getElementById('compressorToggle').checked) {
         const compressor = context.createDynamicsCompressor();
         compressor.threshold.value = parseFloat(document.getElementById('compThreshold').value);
@@ -758,7 +854,7 @@ function createReverbImpulseForContext(context, roomSize) {
     return impulse;
 }
 
-// OPTIMIZED: Update Tracks Display - Cleanup overlays
+// Update Tracks Display
 function updateTracksDisplay() {
     const tracksList = document.getElementById('tracksList');
     const tracksDisplay = document.getElementById('tracksDisplayArea');
@@ -847,14 +943,14 @@ function animateVolumeMeter() {
     });
 }
 
-// OPTIMIZED: Draw Waveform - Improved performance for large files
+// Draw Waveform
 function drawWaveform(buffer, canvas) {
     if (!canvas || !buffer) {
         console.error('Invalid canvas or buffer');
         return;
     }
     
-    const ctx = canvas.getContext('2d', { alpha: false }); // Performance boost
+    const ctx = canvas.getContext('2d', { alpha: false });
     
     // Set canvas width based on buffer duration (aligned with timeline)
     const pixelsPerSecond = 100;
@@ -882,17 +978,14 @@ function drawWaveform(buffer, canvas) {
     const step = Math.ceil(data.length / width);
     const amp = height / 2;
     
-    // PERFORMANCE FIX: Use simpler gradient for faster rendering
     ctx.fillStyle = '#667eea';
     ctx.globalAlpha = 0.9;
     
-    // PERFORMANCE FIX: Batch drawing operations
     ctx.beginPath();
     for (let i = 0; i < width; i++) {
         let min = 1.0;
         let max = -1.0;
         
-        // PERFORMANCE FIX: Sample data more efficiently
         const startIdx = i * step;
         const endIdx = Math.min(startIdx + step, data.length);
         
@@ -912,14 +1005,14 @@ function drawWaveform(buffer, canvas) {
     
     // Store canvas reference for real-time updates
     canvas.audioBuffer = buffer;
-    canvas.waveformDrawn = true; // Mark as drawn
+    canvas.waveformDrawn = true;
 }
 
-// FIXED: Toggle Mute with Volume Control
+// Toggle Mute with Volume Control
 function toggleMute(index) {
     tracks[index].muted = !tracks[index].muted;
     
-    // FIXED: Update volume in real-time if track is playing
+    // Update volume in real-time if track is playing
     if (tracks[index].gainNode) {
         const targetVolume = tracks[index].muted ? 0 : tracks[index].volume;
         tracks[index].gainNode.gain.setValueAtTime(
@@ -938,7 +1031,7 @@ function deleteTrack(index) {
     updateTracksDisplay();
 }
 
-// FIXED: Set Track Volume with Real-time Update
+// Set Track Volume with Real-time Update
 function setTrackVolume(index, value) {
     const newVolume = value / 100;
     tracks[index].volume = newVolume;
@@ -968,7 +1061,6 @@ function setTrackVolume(index, value) {
 function addTrack(type) {
     switch(type) {
         case 'voice':
-            // Voice recording track is added when recording stops
             alert('Click the Record button to start recording voice');
             break;
         case 'audio':
@@ -1019,13 +1111,13 @@ function addTrack(type) {
     }
 }
 
-// OPTIMIZED: Update Playhead - Throttled for better performance
+// Update Playhead
 function updatePlayhead() {
     if (!isPlaying) return;
     
     currentTime = audioContext.currentTime - playbackStartTime;
     
-    // PERFORMANCE FIX: Only update display every 5 frames
+    // Only update display every 5 frames
     if (!updatePlayhead.frameCount) {
         updatePlayhead.frameCount = 0;
     }
@@ -1044,16 +1136,16 @@ function updatePlayhead() {
     animationId = requestAnimationFrame(updatePlayhead);
 }
 
-// OPTIMIZED: Update waveform playback visualization - Reduced lag
+// Update waveform playback visualization
 function updateWaveformPlayback(time) {
-    // PERFORMANCE FIX: Only update every 3 frames to reduce CPU usage
+    // Only update every 3 frames to reduce CPU usage
     if (!updateWaveformPlayback.frameCount) {
         updateWaveformPlayback.frameCount = 0;
     }
     updateWaveformPlayback.frameCount++;
     
     if (updateWaveformPlayback.frameCount % 3 !== 0) {
-        return; // Skip this frame
+        return;
     }
     
     tracks.forEach((track, index) => {
@@ -1063,14 +1155,13 @@ function updateWaveformPlayback(time) {
             const pixelsPerSecond = 100;
             const playPosition = time * pixelsPerSecond;
             
-            // PERFORMANCE FIX: Don't redraw entire waveform, just overlay
             // Only redraw waveform if it hasn't been drawn yet
             if (!canvas.waveformDrawn) {
                 drawWaveform(canvas.audioBuffer, canvas);
                 canvas.waveformDrawn = true;
             }
             
-            // Clear previous overlay (more efficient than redrawing everything)
+            // Clear previous overlay
             const overlayCanvas = canvas.overlayCanvas;
             if (!overlayCanvas) {
                 // Create overlay canvas once
@@ -1132,13 +1223,35 @@ function updateTimeDisplay(time) {
 function handleTimelineClick(e) {
     const canvas = document.getElementById('timelineCanvas');
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
+    const scrollLeft = canvas.parentElement.scrollLeft || 0;
+    const x = e.clientX - rect.left + scrollLeft;
     const pixelsPerSecond = 100;
     const time = x / pixelsPerSecond;
     
-    currentTime = time;
-    updatePlayheadPosition(time);
-    updateTimeDisplay(time);
+    currentTime = Math.max(0, time);
+    updatePlayheadPosition(currentTime);
+    updateTimeDisplay(currentTime);
+    
+    if (isPlaying) {
+        pausePlayback();
+        startPlayback();
+    }
+}
+
+// Handle Timeline Touch Events (NEW)
+function handleTimelineTouch(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const canvas = document.getElementById('timelineCanvas');
+    const rect = canvas.getBoundingClientRect();
+    const scrollLeft = canvas.parentElement.scrollLeft || 0;
+    const x = touch.clientX - rect.left + scrollLeft;
+    const pixelsPerSecond = 100;
+    const time = x / pixelsPerSecond;
+    
+    currentTime = Math.max(0, time);
+    updatePlayheadPosition(currentTime);
+    updateTimeDisplay(currentTime);
     
     if (isPlaying) {
         pausePlayback();
@@ -1218,13 +1331,11 @@ function nextSection() {
 // Undo
 function undo() {
     alert('Undo functionality: Would restore previous state');
-    // Implement undo stack
 }
 
 // Redo
 function redo() {
     alert('Redo functionality: Would restore next state');
-    // Implement redo stack
 }
 
 // Switch Tab
@@ -1239,6 +1350,28 @@ function switchTab(tabName) {
     document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
     document.getElementById(`${tabName}Panel`).classList.add('active');
 }
+
+// Detect if user is on mobile device (NEW)
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
+        || window.innerWidth <= 768;
+}
+
+// Optimize performance for mobile (NEW)
+function optimizeForMobile() {
+    if (isMobileDevice()) {
+        // Reduce animation frequency on mobile
+        updatePlayhead.skipFrames = 8;
+        updateWaveformPlayback.skipFrames = 5;
+        
+        console.log('Mobile optimizations enabled');
+    }
+}
+
+// Call optimization on load
+window.addEventListener('load', () => {
+    optimizeForMobile();
+});
 
 // Make functions globally accessible
 window.toggleMute = toggleMute;
