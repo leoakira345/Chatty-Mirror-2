@@ -1,4 +1,4 @@
-// WebRTC Call Manager with Sound Effects - FIXED VERSION
+// WebRTC Call Manager with Sound Effects - FULLY FIXED VERSION
 class CallManager {
     constructor() {
         this.socket = null;
@@ -14,7 +14,7 @@ class CallManager {
         this.callStartTime = null;
         this.timerInterval = null;
         this.currentCamera = 'user';
-        this.pendingOffer = null; // Store pending offer for receiver
+        this.pendingIceCandidates = []; // Store ICE candidates until remote description is set
         
         // Audio elements
         this.outgoingRingtone = null;
@@ -25,7 +25,9 @@ class CallManager {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' }
+                { urls: 'stun:stun2.l.google.com:19302' },
+                { urls: 'stun:stun3.l.google.com:19302' },
+                { urls: 'stun:stun4.l.google.com:19302' }
             ]
         };
 
@@ -40,6 +42,12 @@ class CallManager {
         this.friendName = params.get('friendName') || 'User';
         this.isVideoCall = params.get('type') === 'video';
 
+        console.log('📞 Call Manager initialized:', {
+            userId: this.userId,
+            friendId: this.friendId,
+            isVideoCall: this.isVideoCall
+        });
+
         // Initialize audio
         this.initializeAudio();
 
@@ -47,8 +55,8 @@ class CallManager {
         this.socket = io('http://localhost:3000');
 
         this.socket.on('connect', () => {
-            console.log('Connected to server');
-            this.socket.emit('register', this.userId);
+            console.log('✅ Connected to server:', this.socket.id);
+            this.socket.emit('user_connected', this.userId);
         });
 
         // WebRTC signaling events
@@ -57,7 +65,7 @@ class CallManager {
         this.socket.on('call:ice-candidate', (data) => this.handleIceCandidate(data));
         this.socket.on('call:accepted', (data) => this.handleCallAccepted(data));
         this.socket.on('call:ended', () => this.handleCallEnded());
-        this.socket.on('call:declined', () => this.handleCallDeclined());
+        this.socket.on('call:declined', (data) => this.handleCallDeclined(data));
 
         this.setupUI();
         this.checkCallType();
@@ -310,9 +318,11 @@ class CallManager {
         const type = new URLSearchParams(window.location.search).get('callType');
         
         if (type === 'outgoing') {
+            console.log('📞 Outgoing call - starting...');
             this.playOutgoingRingtone();
             await this.startCall();
         } else {
+            console.log('📞 Incoming call - waiting for answer...');
             this.playIncomingRingtone();
             document.getElementById('incomingCallScreen').style.display = 'flex';
             document.getElementById('callType').textContent = this.isVideoCall ? 'Video Call' : 'Voice Call';
@@ -323,11 +333,22 @@ class CallManager {
         try {
             console.log('🔵 Starting outgoing call...');
             
+            // Get user media first
             await this.getUserMedia();
+            
+            // Show active call screen
             this.showActiveCallScreen();
+            document.getElementById('callStatus').textContent = 'Calling...';
+            
+            // Create peer connection
             this.createPeerConnection();
 
-            const offer = await this.peerConnection.createOffer();
+            // Create and send offer
+            const offer = await this.peerConnection.createOffer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: this.isVideoCall
+            });
+            
             await this.peerConnection.setLocalDescription(offer);
 
             console.log('📤 Sending offer to:', this.friendId);
@@ -339,11 +360,11 @@ class CallManager {
                 isVideoCall: this.isVideoCall
             });
 
-            document.getElementById('callStatus').textContent = 'Calling...';
         } catch (error) {
-            console.error('Error starting call:', error);
+            console.error('❌ Error starting call:', error);
             this.stopRingtones();
             alert('Failed to start call: ' + error.message);
+            window.close();
         }
     }
 
@@ -353,42 +374,31 @@ class CallManager {
             
             this.stopRingtones();
             
-            await this.getUserMedia();
-            
+            // Hide incoming screen, show active screen
             document.getElementById('incomingCallScreen').style.display = 'none';
             this.showActiveCallScreen();
             document.getElementById('callStatus').textContent = 'Connecting...';
 
-            // Create peer connection BEFORE processing the offer
+            // Get user media
+            await this.getUserMedia();
+            
+            // Create peer connection
             this.createPeerConnection();
             
-            // Process the pending offer
-            if (this.pendingOffer) {
-                console.log('📥 Processing pending offer...');
-                await this.peerConnection.setRemoteDescription(new RTCSessionDescription(this.pendingOffer));
-                
-                const answer = await this.peerConnection.createAnswer();
-                await this.peerConnection.setLocalDescription(answer);
-
-                console.log('📤 Sending answer to:', this.friendId);
-                
-                this.socket.emit('call:answer', {
-                    to: this.friendId,
-                    from: this.userId,
-                    answer: answer
-                });
-            }
-
             // Notify caller that call was accepted
+            console.log('📤 Sending call accepted notification');
             this.socket.emit('call:accepted', {
                 to: this.friendId,
                 from: this.userId
             });
             
+            console.log('✅ Call accepted, waiting for offer...');
+            
         } catch (error) {
-            console.error('Error accepting call:', error);
+            console.error('❌ Error accepting call:', error);
             this.stopRingtones();
             alert('Failed to accept call: ' + error.message);
+            window.close();
         }
     }
 
@@ -421,7 +431,7 @@ class CallManager {
             document.getElementById('localVideo').srcObject = this.localStream;
             console.log('✅ Got user media');
         } catch (error) {
-            console.error('Error accessing media devices:', error);
+            console.error('❌ Error accessing media devices:', error);
             throw error;
         }
     }
@@ -432,10 +442,12 @@ class CallManager {
         this.peerConnection = new RTCPeerConnection(this.iceServers);
 
         // Add local stream tracks
-        this.localStream.getTracks().forEach(track => {
-            this.peerConnection.addTrack(track, this.localStream);
-            console.log('➕ Added track:', track.kind);
-        });
+        if (this.localStream) {
+            this.localStream.getTracks().forEach(track => {
+                this.peerConnection.addTrack(track, this.localStream);
+                console.log('➕ Added local track:', track.kind);
+            });
+        }
 
         // Handle remote stream
         this.peerConnection.ontrack = (event) => {
@@ -463,7 +475,7 @@ class CallManager {
             }
         };
 
-        // Handle connection state
+        // Handle connection state changes
         this.peerConnection.onconnectionstatechange = () => {
             console.log('🔄 Connection state:', this.peerConnection.connectionState);
             
@@ -471,6 +483,7 @@ class CallManager {
                 this.onCallConnected();
             } else if (this.peerConnection.connectionState === 'disconnected' || 
                        this.peerConnection.connectionState === 'failed') {
+                console.log('❌ Connection failed or disconnected');
                 this.handleCallEnded();
             }
         };
@@ -478,47 +491,107 @@ class CallManager {
         // Handle ICE connection state
         this.peerConnection.oniceconnectionstatechange = () => {
             console.log('❄️ ICE connection state:', this.peerConnection.iceConnectionState);
+            
+            if (this.peerConnection.iceConnectionState === 'failed') {
+                console.log('❌ ICE connection failed, restarting ICE...');
+                this.peerConnection.restartIce();
+            }
         };
+
+        console.log('✅ Peer connection created');
     }
 
     async handleOffer(data) {
         try {
             console.log('📥 Received offer from:', data.from);
             
-            // Store the offer to process after user accepts
-            this.pendingOffer = data.offer;
+            if (!this.peerConnection) {
+                console.log('⚠️ Peer connection not ready, waiting...');
+                // Wait a bit and retry
+                setTimeout(() => this.handleOffer(data), 100);
+                return;
+            }
+
+            // Set remote description (the offer)
+            await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+            console.log('✅ Set remote description (offer)');
+
+            // Process any pending ICE candidates
+            if (this.pendingIceCandidates.length > 0) {
+                console.log(`📦 Adding ${this.pendingIceCandidates.length} pending ICE candidates`);
+                for (const candidate of this.pendingIceCandidates) {
+                    await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                }
+                this.pendingIceCandidates = [];
+            }
+
+            // Create and send answer
+            const answer = await this.peerConnection.createAnswer();
+            await this.peerConnection.setLocalDescription(answer);
+
+            console.log('📤 Sending answer to:', data.from);
             
-            // The offer will be processed when user clicks accept
-            // Don't create peer connection here yet!
+            this.socket.emit('call:answer', {
+                to: data.from,
+                from: this.userId,
+                answer: answer
+            });
             
         } catch (error) {
-            console.error('Error handling offer:', error);
+            console.error('❌ Error handling offer:', error);
+            alert('Failed to process call: ' + error.message);
+            this.endCall();
         }
     }
 
     async handleAnswer(data) {
         try {
-            console.log('📥 Received answer');
+            console.log('📥 Received answer from:', data.from);
             
             this.stopRingtones();
             
-            if (this.peerConnection) {
-                await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-                console.log('✅ Set remote description (answer)');
+            if (!this.peerConnection) {
+                console.error('❌ Peer connection not initialized');
+                return;
             }
+
+            await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+            console.log('✅ Set remote description (answer)');
+
+            // Process any pending ICE candidates
+            if (this.pendingIceCandidates.length > 0) {
+                console.log(`📦 Adding ${this.pendingIceCandidates.length} pending ICE candidates`);
+                for (const candidate of this.pendingIceCandidates) {
+                    await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                }
+                this.pendingIceCandidates = [];
+            }
+
+            document.getElementById('callStatus').textContent = 'Connecting...';
+            
         } catch (error) {
-            console.error('Error handling answer:', error);
+            console.error('❌ Error handling answer:', error);
         }
     }
 
     async handleIceCandidate(data) {
         try {
-            if (this.peerConnection && data.candidate) {
-                console.log('🧊 Adding ICE candidate');
-                await this.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            if (!data.candidate) return;
+
+            console.log('🧊 Received ICE candidate');
+
+            // If we don't have remote description yet, queue the candidate
+            if (!this.peerConnection || !this.peerConnection.remoteDescription) {
+                console.log('📦 Queueing ICE candidate (no remote description yet)');
+                this.pendingIceCandidates.push(data.candidate);
+                return;
             }
+
+            await this.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            console.log('✅ Added ICE candidate');
+            
         } catch (error) {
-            console.error('Error handling ICE candidate:', error);
+            console.error('❌ Error handling ICE candidate:', error);
         }
     }
 
@@ -625,7 +698,7 @@ class CallManager {
                 }
             }
         } catch (error) {
-            console.error('Error switching camera:', error);
+            console.error('❌ Error switching camera:', error);
         }
     }
 
@@ -659,13 +732,14 @@ class CallManager {
         }, 500);
     }
 
-    handleCallDeclined() {
-        console.log('❌ Call declined by remote');
+    handleCallDeclined(data) {
+        console.log('❌ Call declined:', data);
         
         this.stopRingtones();
         this.cleanupCall();
         
-        alert('Call declined');
+        const reason = data && data.reason ? data.reason : 'Call declined';
+        alert(reason);
         
         setTimeout(() => {
             window.close();
