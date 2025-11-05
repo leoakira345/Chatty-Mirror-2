@@ -333,147 +333,114 @@ io.on('connection', (socket) => {
     });
 
     // ==========================================
-    // WEBRTC CALL SIGNALING
-    // ==========================================
+    // Replace your existing call signaling section with this:
+
+// ==========================================
+// ==========================================
+// WEBRTC CALL SIGNALING
+// ==========================================
+
+socket.on('call:offer', (data) => {
+    const { to, from, offer, isVideoCall } = data;
     
-    socket.on('call:offer', (data) => {
-        const { to, from, offer, isVideoCall } = data;
-        
-        console.log(`📞 Call offer from ${from} to ${to} (${isVideoCall ? 'video' : 'audio'})`);
-        
-        const receiverSocketId = activeUsers.get(to);
-        if (receiverSocketId) {
-            const receiverSocket = io.sockets.sockets.get(receiverSocketId);
-            if (receiverSocket) {
-                receiverSocket.emit('call:offer', {
-                    from: from,
-                    offer: offer,
-                    isVideoCall: isVideoCall
-                });
-                console.log(`✅ Call offer sent to ${to}`);
-            } else {
-                console.log(`⚠️ Receiver socket not found for ${to}`);
-                socket.emit('call:declined', { reason: 'User not available' });
-            }
+    console.log(`📞 Call offer from ${from} to ${to} (${isVideoCall ? 'video' : 'audio'})`);
+    
+    const receiverSocketId = activeUsers.get(to);
+    if (receiverSocketId) {
+        const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+        if (receiverSocket) {
+            receiverSocket.emit('call:offer', {
+                from: from,
+                offer: offer,
+                isVideoCall: isVideoCall
+            });
+            console.log(`✅ Call offer sent to ${to}`);
         } else {
-            console.log(`⚠️ Receiver ${to} is offline`);
-            socket.emit('call:declined', { reason: 'User is offline' });
+            console.log(`⚠️ Receiver socket not found for ${to}`);
+            socket.emit('call:declined', { reason: 'User not available' });
         }
-    });
+    } else {
+        console.log(`⚠️ Receiver ${to} is offline`);
+        socket.emit('call:declined', { reason: 'User is offline' });
+    }
+});
 
-    socket.on('call:answer', (data) => {
-        const { to, answer } = data;
-        
-        console.log(`📞 Call answer from socket to ${to}`);
-        
-        const receiverSocketId = activeUsers.get(to);
-        if (receiverSocketId) {
-            const receiverSocket = io.sockets.sockets.get(receiverSocketId);
-            if (receiverSocket) {
-                receiverSocket.emit('call:answer', {
-                    answer: answer
-                });
-                console.log(`✅ Call answer sent to ${to}`);
-            }
+socket.on('call:answer', (data) => {
+    const { to, from, answer } = data;
+    
+    console.log(`📞 Call answer from ${from} to ${to}`);
+    
+    const receiverSocketId = activeUsers.get(to);
+    if (receiverSocketId) {
+        const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+        if (receiverSocket) {
+            receiverSocket.emit('call:answer', {
+                from: from,
+                answer: answer
+            });
+            console.log(`✅ Call answer sent to ${to}`);
         }
-    });
+    }
+});
 
-    socket.on('call:ice-candidate', (data) => {
-        const { to, candidate } = data;
-        
-        const receiverSocketId = activeUsers.get(to);
-        if (receiverSocketId) {
-            const receiverSocket = io.sockets.sockets.get(receiverSocketId);
-            if (receiverSocket) {
-                receiverSocket.emit('call:ice-candidate', {
-                    candidate: candidate
-                });
-            }
+socket.on('call:ice-candidate', (data) => {
+    const { to, candidate } = data;
+    
+    const receiverSocketId = activeUsers.get(to);
+    if (receiverSocketId) {
+        const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+        if (receiverSocket) {
+            receiverSocket.emit('call:ice-candidate', {
+                candidate: candidate
+            });
         }
-    });
+    }
+});
 
-    socket.on('call:accepted', (data) => {
-        const { to, from } = data;
-        
-        console.log(`✅ Call accepted by ${from}`);
-        
-        const callerSocketId = activeUsers.get(to);
-        if (callerSocketId) {
-            const callerSocket = io.sockets.sockets.get(callerSocketId);
-            if (callerSocket) {
-                callerSocket.emit('call:accepted', { from: from });
-            }
+socket.on('call:accepted', (data) => {
+    const { to, from } = data;
+    
+    console.log(`✅ Call accepted by ${from}, notifying ${to}`);
+    
+    const callerSocketId = activeUsers.get(to);
+    if (callerSocketId) {
+        const callerSocket = io.sockets.sockets.get(callerSocketId);
+        if (callerSocket) {
+            callerSocket.emit('call:accepted', { from: from });
+            console.log(`✅ Acceptance notification sent to ${to}`);
         }
-    });
+    }
+});
 
-    socket.on('call:declined', (data) => {
-        const { to, from } = data;
-        
-        console.log(`❌ Call declined by ${from}`);
-        
-        const callerSocketId = activeUsers.get(to);
-        if (callerSocketId) {
-            const callerSocket = io.sockets.sockets.get(callerSocketId);
-            if (callerSocket) {
-                callerSocket.emit('call:declined');
-            }
+socket.on('call:declined', (data) => {
+    const { to, from } = data;
+    
+    console.log(`❌ Call declined by ${from}, notifying ${to}`);
+    
+    const callerSocketId = activeUsers.get(to);
+    if (callerSocketId) {
+        const callerSocket = io.sockets.sockets.get(callerSocketId);
+        if (callerSocket) {
+            callerSocket.emit('call:declined');
+            console.log(`✅ Decline notification sent to ${to}`);
         }
-    });
+    }
+});
 
-    socket.on('call:ended', (data) => {
-        const { to, from } = data;
-        
-        console.log(`📞 Call ended by ${from}`);
-        
-        const receiverSocketId = activeUsers.get(to);
-        if (receiverSocketId) {
-            const receiverSocket = io.sockets.sockets.get(receiverSocketId);
-            if (receiverSocket) {
-                receiverSocket.emit('call:ended');
-            }
+socket.on('call:ended', (data) => {
+    const { to, from } = data;
+    
+    console.log(`📞 Call ended by ${from}, notifying ${to}`);
+    
+    const receiverSocketId = activeUsers.get(to);
+    if (receiverSocketId) {
+        const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+        if (receiverSocket) {
+            receiverSocket.emit('call:ended');
+            console.log(`✅ End notification sent to ${to}`);
         }
-    });
-
-    socket.on('call:rejected', (data) => {
-        const { callerId, receiverId } = data;
-        
-        console.log(`❌ Call rejected by ${receiverId}`);
-        
-        const callerSocketId = activeUsers.get(callerId);
-        if (callerSocketId) {
-            const callerSocket = io.sockets.sockets.get(callerSocketId);
-            if (callerSocket) {
-                callerSocket.emit('call:declined');
-            }
-        }
-    });
-
-    socket.on('initiate_call', (data) => {
-        const { callerId, receiverId, callerName, callType } = data;
-        
-        console.log(`📞 Initiating ${callType} call from ${callerId} to ${receiverId}`);
-        
-        const receiverSocketId = activeUsers.get(receiverId);
-        if (receiverSocketId) {
-            const receiverSocket = io.sockets.sockets.get(receiverSocketId);
-            if (receiverSocket) {
-                receiverSocket.emit('incoming_call', {
-                    callerId: callerId,
-                    callerName: callerName,
-                    callType: callType,
-                    roomId: `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-                });
-                console.log(`✅ Incoming call notification sent to ${receiverId}`);
-            } else {
-                console.log(`⚠️ Receiver socket not found`);
-                socket.emit('call_failed', { reason: 'User not available' });
-            }
-        } else {
-            console.log(`⚠️ Receiver ${receiverId} is offline`);
-            socket.emit('call_failed', { reason: 'User is offline' });
-        }
-    });
-
+    }
+});
     // ==========================================
     // DISCONNECT AND ERROR HANDLERS
     // ==========================================
