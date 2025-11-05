@@ -129,6 +129,21 @@ function sanitizeInput(input) {
 io.on('connection', (socket) => {
     console.log('🔌 New client connected:', socket.id);
 
+    // DEBUG: Log all incoming events
+    const originalOnevent = socket.onevent;
+    socket.onevent = function(packet) {
+        const args = packet.data || [];
+        const eventName = args[0];
+        
+        // Log all events except the noisy ones
+        if (!['ping', 'pong'].includes(eventName)) {
+            console.log(`📡 EVENT RECEIVED: "${eventName}"`, 
+                args[1] ? JSON.stringify(args[1]).substring(0, 100) : '');
+        }
+        
+        originalOnevent.call(this, packet);
+    };
+
     socket.on('user_connected', async (userId) => {
         if (!/^\d{4}$/.test(userId)) {
             socket.emit('error', { message: 'Invalid user ID format' });
