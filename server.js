@@ -347,15 +347,20 @@ io.on('connection', (socket) => {
         }
     });
 
-    // WEBRTC CALL SIGNALING - FIXED VERSION
-// Replace your existing call signaling section with this
-// ==========================================
+   // FIXED WebRTC Call Signaling Section
+// Replace your existing call signaling section (lines ~380-520) with this:
 
 // Handle call initiation (notification to receiver)
 socket.on('initiate_call', (data) => {
     const { callerId, receiverId, callerName, callType } = data;
     
     console.log(`📞 Call initiation: ${callerId} -> ${receiverId} (${callType})`);
+    
+    // Validate data
+    if (!callerId || !receiverId || !callerName || !callType) {
+        socket.emit('call:declined', { reason: 'Invalid call data' });
+        return;
+    }
     
     const receiverSocketId = activeUsers.get(receiverId);
     
@@ -379,7 +384,7 @@ socket.on('initiate_call', (data) => {
     }
 });
 
-// Handle call rejection (when user clicks decline)
+// Handle call rejection (when user clicks decline on incoming screen)
 socket.on('call_rejected', (data) => {
     const { callerId, receiverId } = data;
     
@@ -389,7 +394,10 @@ socket.on('call_rejected', (data) => {
     if (callerSocketId) {
         const callerSocket = io.sockets.sockets.get(callerSocketId);
         if (callerSocket) {
-            callerSocket.emit('call:declined', { reason: 'Call declined' });
+            callerSocket.emit('call:declined', { 
+                reason: 'Call declined by user',
+                from: receiverId 
+            });
             console.log(`✅ Notified caller ${callerId} about rejection`);
         }
     }
@@ -400,6 +408,11 @@ socket.on('call:offer', (data) => {
     const { to, from, offer, isVideoCall } = data;
     
     console.log(`📞 Call offer from ${from} to ${to} (${isVideoCall ? 'video' : 'audio'})`);
+    
+    if (!to || !from || !offer) {
+        console.log('❌ Invalid offer data');
+        return;
+    }
     
     const receiverSocketId = activeUsers.get(to);
     if (receiverSocketId) {
@@ -413,11 +426,17 @@ socket.on('call:offer', (data) => {
             console.log(`✅ Call offer sent to ${to}`);
         } else {
             console.log(`⚠️ Receiver socket not found for ${to}`);
-            socket.emit('call:declined', { reason: 'User not available' });
+            socket.emit('call:declined', { 
+                reason: 'User not available',
+                from: to 
+            });
         }
     } else {
         console.log(`⚠️ Receiver ${to} is offline`);
-        socket.emit('call:declined', { reason: 'User is offline' });
+        socket.emit('call:declined', { 
+            reason: 'User is offline',
+            from: to 
+        });
     }
 });
 
@@ -426,6 +445,11 @@ socket.on('call:answer', (data) => {
     const { to, from, answer } = data;
     
     console.log(`📞 Call answer from ${from} to ${to}`);
+    
+    if (!to || !from || !answer) {
+        console.log('❌ Invalid answer data');
+        return;
+    }
     
     const receiverSocketId = activeUsers.get(to);
     if (receiverSocketId) {
@@ -436,21 +460,32 @@ socket.on('call:answer', (data) => {
                 answer: answer
             });
             console.log(`✅ Call answer sent to ${to}`);
+        } else {
+            console.log(`⚠️ Caller socket not found for ${to}`);
         }
     }
 });
 
 // Handle ICE candidates
 socket.on('call:ice-candidate', (data) => {
-    const { to, candidate } = data;
+    const { to, candidate, from } = data;
+    
+    if (!to || !candidate) {
+        console.log('❌ Invalid ICE candidate data');
+        return;
+    }
+    
+    console.log(`🧊 Forwarding ICE candidate from ${from || 'unknown'} to ${to}`);
     
     const receiverSocketId = activeUsers.get(to);
     if (receiverSocketId) {
         const receiverSocket = io.sockets.sockets.get(receiverSocketId);
         if (receiverSocket) {
             receiverSocket.emit('call:ice-candidate', {
-                candidate: candidate
+                candidate: candidate,
+                from: from
             });
+            console.log(`✅ ICE candidate sent to ${to}`);
         }
     }
 });
@@ -460,6 +495,11 @@ socket.on('call:accepted', (data) => {
     const { to, from } = data;
     
     console.log(`✅ Call accepted by ${from}, notifying ${to}`);
+    
+    if (!to || !from) {
+        console.log('❌ Invalid acceptance data');
+        return;
+    }
     
     const callerSocketId = activeUsers.get(to);
     if (callerSocketId) {
@@ -473,15 +513,23 @@ socket.on('call:accepted', (data) => {
 
 // Handle call declined (from call window decline button)
 socket.on('call:declined', (data) => {
-    const { to, from } = data;
+    const { to, from, reason } = data;
     
     console.log(`❌ Call declined by ${from}, notifying ${to}`);
+    
+    if (!to) {
+        console.log('❌ Invalid decline data - no recipient');
+        return;
+    }
     
     const callerSocketId = activeUsers.get(to);
     if (callerSocketId) {
         const callerSocket = io.sockets.sockets.get(callerSocketId);
         if (callerSocket) {
-            callerSocket.emit('call:declined', { reason: 'Call declined by user' });
+            callerSocket.emit('call:declined', { 
+                reason: reason || 'Call declined by user',
+                from: from 
+            });
             console.log(`✅ Decline notification sent to ${to}`);
         }
     }
@@ -493,11 +541,16 @@ socket.on('call:ended', (data) => {
     
     console.log(`📞 Call ended by ${from}, notifying ${to}`);
     
+    if (!to) {
+        console.log('❌ Invalid end call data');
+        return;
+    }
+    
     const receiverSocketId = activeUsers.get(to);
     if (receiverSocketId) {
         const receiverSocket = io.sockets.sockets.get(receiverSocketId);
         if (receiverSocket) {
-            receiverSocket.emit('call:ended');
+            receiverSocket.emit('call:ended', { from: from });
             console.log(`✅ End notification sent to ${to}`);
         }
     }
