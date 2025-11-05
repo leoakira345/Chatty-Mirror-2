@@ -58,12 +58,17 @@ class CallManager {
     }
 
     connectSocket() {
-        this.socket = io('http://localhost:3000', {
-            transports: ['websocket', 'polling'],
-            reconnection: true,
-            reconnectionAttempts: 5,
-            reconnectionDelay: 1000
-        });
+    // Use the global SERVER_URL or fallback to localhost
+    const serverUrl = window.SERVER_URL || 'http://localhost:3000';
+    
+    console.log('🔌 Connecting to server:', serverUrl);
+    
+    this.socket = io(serverUrl, {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000
+    });
 
         this.socket.on('connect', () => {
             console.log('✅ Socket connected:', this.socket.id);
@@ -934,4 +939,3 @@ window.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 Initializing Call Manager...');
     new CallManager();
 });
-
