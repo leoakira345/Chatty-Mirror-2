@@ -1,18 +1,26 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
 const cors = require('cors');
-const fs = require('fs').promises;
-const path = require('path');
 const axios = require('axios');
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const validator = require('validator');
 
+// Import MongoDB database module
+const {
+    connectDB,
+    userOperations,
+    messageOperations,
+    friendshipOperations,
+    migrateFromFiles
+} = require('./db');
+
 const app = express();
 const server = http.createServer(app);
 
-// FIXED: Restrict CORS to your actual domain
+// CORS Configuration
 const io = socketIO(server, {
     cors: {
         origin: process.env.CLIENT_URL || "http://localhost:3001",
@@ -29,7 +37,6 @@ const io = socketIO(server, {
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
 
-// FIXED: Restrict CORS
 app.use(cors({
     origin: process.env.CLIENT_URL || "http://localhost:3001",
     credentials: true
@@ -37,14 +44,14 @@ app.use(cors({
 
 // Rate limiting
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
+    windowMs: 15 * 60 * 1000,
+    max: 100,
     message: 'Too many requests from this IP, please try again later.'
 });
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 5, // Limit each IP to 5 login attempts per 15 minutes
+    max: 5,
     message: 'Too many login attempts, please try again later.'
 });
 
@@ -53,143 +60,12 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(express.static('public'));
 
-const DATA_DIR = path.join(__dirname, 'data');
 const activeUsers = new Map();
-const writeLocks = new Map();
-
-// FIXED: No hardcoded API key
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
 // ==========================================
 // UTILITY FUNCTIONS
 // ==========================================
-
-async function ensureDataDirectory() {
-    try {
-        await fs.mkdir(DATA_DIR, { recursive: true });
-        console.log('✅ Data directory ready');
-        await cleanupTempFiles();
-    } catch (error) {
-        console.error('❌ Error creating data directory:', error);
-    }
-}
-
-async function cleanupTempFiles() {
-    try {
-        const files = await fs.readdir(DATA_DIR);
-        const tempFiles = files.filter(f => f.endsWith('.tmp'));
-        
-        if (tempFiles.length > 0) {
-            console.log(`🧹 Cleaning up ${tempFiles.length} temporary files...`);
-            
-            for (const tempFile of tempFiles) {
-                const tempPath = path.join(DATA_DIR, tempFile);
-                try {
-                    const stats = await fs.stat(tempPath);
-                    if (Date.now() - stats.mtimeMs > 60000) {
-                        await fs.unlink(tempPath);
-                        console.log(`   Deleted: ${tempFile}`);
-                    }
-                } catch (err) {
-                    // File might have been deleted already
-                }
-            }
-        }
-    } catch (error) {
-        console.error('⚠️  Error cleaning temp files:', error.message);
-    }
-}
-
-async function readJSON(filename) {
-    try {
-        const filePath = path.join(DATA_DIR, filename);
-        const data = await fs.readFile(filePath, 'utf8');
-        
-        if (!data || data.trim().length === 0) {
-            console.log(`⚠️  Empty file: ${filename}`);
-            return null;
-        }
-        
-        try {
-            const parsed = JSON.parse(data);
-            return parsed;
-        } catch (parseError) {
-            console.error(`❌ JSON Parse Error in ${filename}:`, parseError.message);
-            const backupPath = path.join(DATA_DIR, `${filename}.corrupted.${Date.now()}`);
-            await fs.writeFile(backupPath, data, 'utf8');
-            console.log(`   Backed up to: ${backupPath}`);
-            return null;
-        }
-    } catch (error) {
-        if (error.code === 'ENOENT') {
-            return null;
-        }
-        console.error(`❌ Error reading file ${filename}:`, error);
-        throw error;
-    }
-}
-
-async function writeJSON(filename, data) {
-    const filePath = path.join(DATA_DIR, filename);
-    const tempPath = filePath + '.tmp';
-    
-    let waitCount = 0;
-    while (writeLocks.get(filename)) {
-        await new Promise(resolve => setTimeout(resolve, 10));
-        waitCount++;
-        if (waitCount > 100) {
-            console.error(`⚠️  Write lock timeout for ${filename}`);
-            break;
-        }
-    }
-    
-    writeLocks.set(filename, true);
-    
-    try {
-        let jsonString;
-        
-        try {
-            jsonString = JSON.stringify(data, null, 2);
-        } catch (stringifyError) {
-            console.error('❌ Error stringifying data:', stringifyError);
-            return false;
-        }
-        
-        try {
-            JSON.parse(jsonString);
-        } catch (validateError) {
-            console.error('❌ Generated invalid JSON:', validateError);
-            return false;
-        }
-        
-        await fs.writeFile(tempPath, jsonString, 'utf8');
-        
-        try {
-            const verifyData = await fs.readFile(tempPath, 'utf8');
-            JSON.parse(verifyData);
-        } catch (verifyError) {
-            console.error('❌ Temporary file verification failed:', verifyError);
-            await fs.unlink(tempPath);
-            return false;
-        }
-        
-        await fs.rename(tempPath, filePath);
-        return true;
-        
-    } catch (error) {
-        console.error(`❌ Error writing JSON ${filename}:`, error);
-        
-        try {
-            await fs.unlink(tempPath);
-        } catch (unlinkError) {
-            // Ignore if temp file doesn't exist
-        }
-        
-        return false;
-    } finally {
-        writeLocks.delete(filename);
-    }
-}
 
 function parseDuration(duration) {
     try {
@@ -213,8 +89,8 @@ async function generateUniqueUserId() {
     
     while (!isUnique) {
         userId = Math.floor(1000 + Math.random() * 9000).toString();
-        const existingUser = await readJSON(`user_${userId}.json`);
-        if (!existingUser) {
+        const exists = await userOperations.userExists(userId);
+        if (!exists) {
             isUnique = true;
         }
     }
@@ -222,7 +98,6 @@ async function generateUniqueUserId() {
     return userId;
 }
 
-// FIXED: Secure password hashing with bcrypt
 async function hashPassword(password) {
     try {
         const salt = await bcrypt.genSalt(10);
@@ -242,7 +117,6 @@ async function verifyPassword(password, hash) {
     }
 }
 
-// Input sanitization function
 function sanitizeInput(input) {
     if (typeof input !== 'string') return input;
     return validator.escape(input.trim());
@@ -256,7 +130,6 @@ io.on('connection', (socket) => {
     console.log('🔌 New client connected:', socket.id);
 
     socket.on('user_connected', async (userId) => {
-        // Validate userId format
         if (!/^\d{4}$/.test(userId)) {
             socket.emit('error', { message: 'Invalid user ID format' });
             return;
@@ -274,29 +147,24 @@ io.on('connection', (socket) => {
         
         socket.broadcast.emit('user_status', { userId, status: 'online' });
         
+        // Deliver pending messages from database
         try {
-            const files = await fs.readdir(DATA_DIR);
-            const messageFiles = files.filter(f => 
-                f.startsWith('messages_') && 
-                f.includes(userId) && 
-                f.endsWith('.json')
-            );
+            const undeliveredMessages = await messageOperations.getUndeliveredMessages(userId);
             
-            for (const file of messageFiles) {
-                const messagesData = await readJSON(file);
-                if (messagesData && messagesData.messages) {
-                    const undeliveredMessages = messagesData.messages.filter(m => 
-                        m.receiverId === userId && 
-                        m.status === 'sent'
-                    );
-                    
-                    if (undeliveredMessages.length > 0) {
-                        console.log(`📬 Delivering ${undeliveredMessages.length} pending messages to ${userId}`);
-                        undeliveredMessages.forEach(msg => {
-                            socket.emit('new_message', msg);
-                        });
-                    }
-                }
+            if (undeliveredMessages.length > 0) {
+                console.log(`📬 Delivering ${undeliveredMessages.length} pending messages to ${userId}`);
+                undeliveredMessages.forEach(msg => {
+                    socket.emit('new_message', {
+                        id: msg.messageId,
+                        senderId: msg.senderId,
+                        receiverId: msg.receiverId,
+                        content: msg.content,
+                        type: msg.type,
+                        timestamp: msg.timestamp,
+                        status: msg.status,
+                        seenAt: msg.seenAt
+                    });
+                });
             }
         } catch (error) {
             console.error('❌ Error delivering pending messages:', error);
@@ -325,27 +193,21 @@ io.on('connection', (socket) => {
                 throw new Error('Invalid user ID format');
             }
 
-            // Validate message type
             const validTypes = ['text', 'image', 'video', 'file', 'audio'];
             if (!validTypes.includes(type)) {
                 throw new Error('Invalid message type');
             }
 
-            // Sanitize text content
             let sanitizedContent = content;
             if (type === 'text' && typeof content === 'string') {
                 sanitizedContent = sanitizeInput(content);
                 
-                // Check message length
                 if (sanitizedContent.length > 5000) {
                     throw new Error('Message too long');
                 }
             }
 
             console.log('✅ Validation passed');
-
-            const chatId = [senderId, receiverId].sort().join('_');
-            console.log('💾 Chat ID:', chatId);
             
             const message = {
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -360,29 +222,14 @@ io.on('connection', (socket) => {
             
             console.log('📝 Message ID:', message.id);
             
-            let messagesData = await readJSON(`messages_${chatId}.json`);
-            console.log('📂 Existing messages:', messagesData ? messagesData.messages?.length : 0);
+            // Save to MongoDB
+            const savedMessage = await messageOperations.saveMessage(message);
             
-            if (!messagesData) {
-                messagesData = { messages: [] };
-                console.log('📂 Creating new messages file');
+            if (!savedMessage) {
+                throw new Error('Failed to save message to database');
             }
             
-            if (!Array.isArray(messagesData.messages)) {
-                console.log('⚠️  Messages was not an array, creating new array');
-                messagesData.messages = [];
-            }
-            
-            messagesData.messages.push(message);
-            console.log('📊 Total messages in chat:', messagesData.messages.length);
-            
-            const saved = await writeJSON(`messages_${chatId}.json`, messagesData);
-            
-            if (!saved) {
-                throw new Error('Failed to save message to file');
-            }
-            
-            console.log('✅ Message saved to file successfully');
+            console.log('✅ Message saved to database successfully');
             
             socket.emit('message_sent', { 
                 success: true, 
@@ -462,44 +309,21 @@ io.on('connection', (socket) => {
         }
         
         try {
-            const files = await fs.readdir(DATA_DIR);
-            const messageFiles = files.filter(f => f.startsWith('messages_') && f.endsWith('.json'));
+            const updatedMessage = await messageOperations.markMessageSeen(messageId, Date.now());
             
-            let messageFound = false;
-            
-            for (const file of messageFiles) {
-                const messagesData = await readJSON(file);
+            if (updatedMessage) {
+                console.log(`✅ Message ${messageId} marked as seen`);
                 
-                if (messagesData && messagesData.messages) {
-                    const messageIndex = messagesData.messages.findIndex(m => m.id === messageId);
-                    
-                    if (messageIndex !== -1) {
-                        const message = messagesData.messages[messageIndex];
-                        
-                        messagesData.messages[messageIndex].status = 'seen';
-                        messagesData.messages[messageIndex].seenAt = Date.now();
-                        
-                        await writeJSON(file, messagesData);
-                        
-                        messageFound = true;
-                        console.log(`✅ Message ${messageId} marked as seen`);
-                        
-                        const senderSocketId = activeUsers.get(message.senderId);
-                        if (senderSocketId) {
-                            io.to(senderSocketId).emit('message_seen', {
-                                messageId: messageId,
-                                seenBy: userId,
-                                seenAt: Date.now()
-                            });
-                            console.log(`✅ Notified sender ${message.senderId}`);
-                        }
-                        
-                        break;
-                    }
+                const senderSocketId = activeUsers.get(updatedMessage.senderId);
+                if (senderSocketId) {
+                    io.to(senderSocketId).emit('message_seen', {
+                        messageId: messageId,
+                        seenBy: userId,
+                        seenAt: Date.now()
+                    });
+                    console.log(`✅ Notified sender ${updatedMessage.senderId}`);
                 }
-            }
-            
-            if (!messageFound) {
+            } else {
                 console.log(`⚠️  Message ${messageId} not found`);
             }
             
@@ -507,6 +331,152 @@ io.on('connection', (socket) => {
             console.error('❌ Error marking message as seen:', error);
         }
     });
+
+    // ==========================================
+    // WEBRTC CALL SIGNALING
+    // ==========================================
+    
+    socket.on('call:offer', (data) => {
+        const { to, from, offer, isVideoCall } = data;
+        
+        console.log(`📞 Call offer from ${from} to ${to} (${isVideoCall ? 'video' : 'audio'})`);
+        
+        const receiverSocketId = activeUsers.get(to);
+        if (receiverSocketId) {
+            const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+            if (receiverSocket) {
+                receiverSocket.emit('call:offer', {
+                    from: from,
+                    offer: offer,
+                    isVideoCall: isVideoCall
+                });
+                console.log(`✅ Call offer sent to ${to}`);
+            } else {
+                console.log(`⚠️ Receiver socket not found for ${to}`);
+                socket.emit('call:declined', { reason: 'User not available' });
+            }
+        } else {
+            console.log(`⚠️ Receiver ${to} is offline`);
+            socket.emit('call:declined', { reason: 'User is offline' });
+        }
+    });
+
+    socket.on('call:answer', (data) => {
+        const { to, answer } = data;
+        
+        console.log(`📞 Call answer from socket to ${to}`);
+        
+        const receiverSocketId = activeUsers.get(to);
+        if (receiverSocketId) {
+            const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+            if (receiverSocket) {
+                receiverSocket.emit('call:answer', {
+                    answer: answer
+                });
+                console.log(`✅ Call answer sent to ${to}`);
+            }
+        }
+    });
+
+    socket.on('call:ice-candidate', (data) => {
+        const { to, candidate } = data;
+        
+        const receiverSocketId = activeUsers.get(to);
+        if (receiverSocketId) {
+            const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+            if (receiverSocket) {
+                receiverSocket.emit('call:ice-candidate', {
+                    candidate: candidate
+                });
+            }
+        }
+    });
+
+    socket.on('call:accepted', (data) => {
+        const { to, from } = data;
+        
+        console.log(`✅ Call accepted by ${from}`);
+        
+        const callerSocketId = activeUsers.get(to);
+        if (callerSocketId) {
+            const callerSocket = io.sockets.sockets.get(callerSocketId);
+            if (callerSocket) {
+                callerSocket.emit('call:accepted', { from: from });
+            }
+        }
+    });
+
+    socket.on('call:declined', (data) => {
+        const { to, from } = data;
+        
+        console.log(`❌ Call declined by ${from}`);
+        
+        const callerSocketId = activeUsers.get(to);
+        if (callerSocketId) {
+            const callerSocket = io.sockets.sockets.get(callerSocketId);
+            if (callerSocket) {
+                callerSocket.emit('call:declined');
+            }
+        }
+    });
+
+    socket.on('call:ended', (data) => {
+        const { to, from } = data;
+        
+        console.log(`📞 Call ended by ${from}`);
+        
+        const receiverSocketId = activeUsers.get(to);
+        if (receiverSocketId) {
+            const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+            if (receiverSocket) {
+                receiverSocket.emit('call:ended');
+            }
+        }
+    });
+
+    socket.on('call:rejected', (data) => {
+        const { callerId, receiverId } = data;
+        
+        console.log(`❌ Call rejected by ${receiverId}`);
+        
+        const callerSocketId = activeUsers.get(callerId);
+        if (callerSocketId) {
+            const callerSocket = io.sockets.sockets.get(callerSocketId);
+            if (callerSocket) {
+                callerSocket.emit('call:declined');
+            }
+        }
+    });
+
+    socket.on('initiate_call', (data) => {
+        const { callerId, receiverId, callerName, callType } = data;
+        
+        console.log(`📞 Initiating ${callType} call from ${callerId} to ${receiverId}`);
+        
+        const receiverSocketId = activeUsers.get(receiverId);
+        if (receiverSocketId) {
+            const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+            if (receiverSocket) {
+                receiverSocket.emit('incoming_call', {
+                    callerId: callerId,
+                    callerName: callerName,
+                    callType: callType,
+                    roomId: `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+                });
+                console.log(`✅ Incoming call notification sent to ${receiverId}`);
+            } else {
+                console.log(`⚠️ Receiver socket not found`);
+                socket.emit('call_failed', { reason: 'User not available' });
+            }
+        } else {
+            console.log(`⚠️ Receiver ${receiverId} is offline`);
+            socket.emit('call_failed', { reason: 'User is offline' });
+        }
+    });
+
+    // ==========================================
+    // DISCONNECT AND ERROR HANDLERS
+    // ==========================================
 
     socket.on('disconnect', () => {
         let disconnectedUserId = null;
@@ -531,7 +501,9 @@ io.on('connection', (socket) => {
     socket.on('error', (error) => {
         console.error('❌ Socket error:', error);
     });
-});
+
+}); // ← CLOSING BRACKET FOR io.on('connection')
+
 
 // ==========================================
 // API ROUTES
@@ -540,18 +512,19 @@ io.on('connection', (socket) => {
 app.get('/', (req, res) => {
     res.json({
         success: true,
-        message: 'Chatty Mirror Server is running',
-        version: '3.0-secure',
+        message: 'Chatty Mirror Server with MongoDB',
+        version: '4.0-mongodb',
         activeUsers: activeUsers.size,
+        database: 'MongoDB',
         features: [
+            'Persistent data storage',
             'Text messaging',
             'Image sharing',
             'Video sharing',
             'File sharing',
             'Audio messages',
             'Karaoke recordings',
-            'Secure authentication',
-            'Rate limiting'
+            'Secure authentication'
         ]
     });
 });
@@ -571,7 +544,7 @@ app.post('/api/user/init', async (req, res) => {
             isLegacy: true
         };
         
-        await writeJSON(`user_${userId}.json`, user);
+        await userOperations.createUser(user);
         console.log(`👤 New legacy user created: ${userId}`);
         
         const { password: _, ...userWithoutPassword } = user;
@@ -597,7 +570,7 @@ app.get('/api/user/:userId', async (req, res) => {
             });
         }
         
-        const user = await readJSON(`user_${userId}.json`);
+        const user = await userOperations.getUserById(userId);
         
         if (!user) {
             console.log(`❌ User not found: ${userId}`);
@@ -609,16 +582,14 @@ app.get('/api/user/:userId', async (req, res) => {
         
         console.log(`✅ User found: ${userId}`);
         
-        const { password: _, ...userWithoutPassword } = user;
-        
         res.json({
             success: true,
             user: {
-                id: userWithoutPassword.id,
-                username: userWithoutPassword.username || `User${userId}`,
-                email: userWithoutPassword.email || null,
-                profilePhoto: userWithoutPassword.profilePhoto || null,
-                createdAt: userWithoutPassword.createdAt || Date.now()
+                id: user.userId,
+                username: user.username || `User${userId}`,
+                email: user.email || null,
+                profilePhoto: user.profilePhoto || null,
+                createdAt: user.createdAt || Date.now()
             }
         });
         
@@ -639,10 +610,12 @@ app.post('/api/user/update', async (req, res) => {
             return res.json({ success: false, message: 'Invalid user ID' });
         }
 
-        const user = await readJSON(`user_${userId}.json`);
+        const user = await userOperations.getUserById(userId);
         if (!user) {
             return res.json({ success: false, message: 'User not found' });
         }
+
+        const updates = {};
 
         if (username) {
             username = sanitizeInput(username);
@@ -650,19 +623,26 @@ app.post('/api/user/update', async (req, res) => {
             if (username.length < 2 || username.length > 25) {
                 return res.json({ success: false, message: 'Username must be 2-25 characters' });
             }
-            user.username = username;
+            updates.username = username;
         }
 
         if (profilePhoto !== undefined) {
-            user.profilePhoto = profilePhoto;
+            updates.profilePhoto = profilePhoto;
         }
 
-        user.updatedAt = Date.now();
-        const saved = await writeJSON(`user_${userId}.json`, user);
+        const updatedUser = await userOperations.updateUser(userId, updates);
 
-        if (saved) {
-            const { password: _, ...userWithoutPassword } = user;
-            res.json({ success: true, user: userWithoutPassword });
+        if (updatedUser) {
+            res.json({ 
+                success: true, 
+                user: {
+                    id: updatedUser.userId,
+                    username: updatedUser.username,
+                    email: updatedUser.email,
+                    profilePhoto: updatedUser.profilePhoto,
+                    createdAt: updatedUser.createdAt
+                }
+            });
         } else {
             res.json({ success: false, message: 'Failed to save' });
         }
@@ -680,21 +660,16 @@ app.get('/api/friends/:userId', async (req, res) => {
             return res.json({ success: false, message: 'Invalid user ID' });
         }
         
-        const friendsData = await readJSON(`friends_${userId}.json`);
-        
-        if (!friendsData || !friendsData.friendIds) {
-            return res.json({ success: true, friends: [] });
-        }
+        const friendIds = await friendshipOperations.getFriends(userId);
         
         const friends = [];
-        for (const friendId of friendsData.friendIds) {
-            const friend = await readJSON(`user_${friendId}.json`);
+        for (const friendId of friendIds) {
+            const friend = await userOperations.getUserById(friendId);
             if (friend) {
-                const { password: _, ...friendWithoutPassword } = friend;
                 friends.push({
-                    id: friendWithoutPassword.id,
-                    username: friendWithoutPassword.username,
-                    profilePhoto: friendWithoutPassword.profilePhoto || null,
+                    id: friend.userId,
+                    username: friend.username,
+                    profilePhoto: friend.profilePhoto || null,
                     isOnline: activeUsers.has(friendId)
                 });
             }
@@ -725,8 +700,8 @@ app.post('/api/friends/add', async (req, res) => {
             return res.json({ success: false, message: 'Cannot add yourself as friend' });
         }
         
-        const user = await readJSON(`user_${userId}.json`);
-        const friendUser = await readJSON(`user_${friendId}.json`);
+        const user = await userOperations.getUserById(userId);
+        const friendUser = await userOperations.getUserById(friendId);
         
         if (!user) {
             return res.json({ success: false, message: 'Your user account not found' });
@@ -736,61 +711,55 @@ app.post('/api/friends/add', async (req, res) => {
             return res.json({ success: false, message: 'User not found' });
         }
         
-        let userFriends = await readJSON(`friends_${userId}.json`) || { friendIds: [] };
-        if (!Array.isArray(userFriends.friendIds)) {
-            userFriends.friendIds = [];
-        }
+        const added = await friendshipOperations.addFriend(userId, friendId);
         
-        if (!userFriends.friendIds.includes(friendId)) {
-            userFriends.friendIds.push(friendId);
-            await writeJSON(`friends_${userId}.json`, userFriends);
-            console.log(`✅ Added ${friendId} to ${userId}'s friend list`);
-        }
-        
-        let friendFriends = await readJSON(`friends_${friendId}.json`) || { friendIds: [] };
-        if (!Array.isArray(friendFriends.friendIds)) {
-            friendFriends.friendIds = [];
-        }
-        
-        if (!friendFriends.friendIds.includes(userId)) {
-            friendFriends.friendIds.push(userId);
-            await writeJSON(`friends_${friendId}.json`, friendFriends);
-            console.log(`✅ Added ${userId} to ${friendId}'s friend list`);
-        }
-        
-        const userSocketId = activeUsers.get(userId);
-        const friendSocketId = activeUsers.get(friendId);
-        
-        if (userSocketId) {
-            const userSocket = io.sockets.sockets.get(userSocketId);
-            if (userSocket) {
-                const { password: _, ...friendWithoutPassword } = friendUser;
-                userSocket.emit('friend_added', { 
-                    friendId: friendId,
-                    friend: friendWithoutPassword 
-                });
+        if (added) {
+            console.log(`✅ Friend relationship established: ${userId} <-> ${friendId}`);
+            
+            // Notify both users via socket
+            const userSocketId = activeUsers.get(userId);
+            const friendSocketId = activeUsers.get(friendId);
+            
+            if (userSocketId) {
+                const userSocket = io.sockets.sockets.get(userSocketId);
+                if (userSocket) {
+                    userSocket.emit('friend_added', { 
+                        friendId: friendId,
+                        friend: {
+                            id: friendUser.userId,
+                            username: friendUser.username,
+                            profilePhoto: friendUser.profilePhoto
+                        }
+                    });
+                }
             }
-        }
-        
-        if (friendSocketId) {
-            const friendSocket = io.sockets.sockets.get(friendSocketId);
-            if (friendSocket) {
-                const { password: _, ...userWithoutPassword } = user;
-                friendSocket.emit('friend_added', { 
-                    friendId: userId,
-                    friend: userWithoutPassword 
-                });
+            
+            if (friendSocketId) {
+                const friendSocket = io.sockets.sockets.get(friendSocketId);
+                if (friendSocket) {
+                    friendSocket.emit('friend_added', { 
+                        friendId: userId,
+                        friend: {
+                            id: user.userId,
+                            username: user.username,
+                            profilePhoto: user.profilePhoto
+                        }
+                    });
+                }
             }
+            
+            res.json({ 
+                success: true, 
+                message: 'Friend added successfully',
+                friend: {
+                    id: friendUser.userId,
+                    username: friendUser.username,
+                    profilePhoto: friendUser.profilePhoto
+                }
+            });
+        } else {
+            res.json({ success: false, message: 'Failed to add friend' });
         }
-        
-        console.log(`✅ Friend relationship established: ${userId} <-> ${friendId}`);
-        
-        const { password: _, ...friendWithoutPassword } = friendUser;
-        res.json({ 
-            success: true, 
-            message: 'Friend added successfully',
-            friend: friendWithoutPassword
-        });
     } catch (error) {
         console.error('❌ Error adding friend:', error);
         res.status(500).json({ 
@@ -808,14 +777,24 @@ app.get('/api/messages/:userId1/:userId2', async (req, res) => {
             return res.json({ success: false, message: 'Invalid user ID format' });
         }
         
-        const chatId = [userId1, userId2].sort().join('_');
-        const messagesData = await readJSON(`messages_${chatId}.json`);
+        const dbMessages = await messageOperations.getMessages(userId1, userId2);
         
-        console.log(`📬 Loading messages for ${chatId}: ${messagesData?.messages?.length || 0} messages`);
+        const messages = dbMessages.map(msg => ({
+            id: msg.messageId,
+            senderId: msg.senderId,
+            receiverId: msg.receiverId,
+            content: msg.content,
+            type: msg.type,
+            timestamp: msg.timestamp,
+            status: msg.status,
+            seenAt: msg.seenAt
+        }));
+        
+        console.log(`📬 Loading messages for ${userId1}<->${userId2}: ${messages.length} messages`);
         
         res.json({
             success: true,
-            messages: messagesData?.messages || []
+            messages: messages
         });
     } catch (error) {
         console.error('❌ Error getting messages:', error);
@@ -826,11 +805,11 @@ app.get('/api/messages/:userId1/:userId2', async (req, res) => {
 app.get('/api/health', (req, res) => {
     res.json({
         success: true,
-        message: 'Server is running',
+        message: 'Server is running with MongoDB',
         activeUsers: activeUsers.size,
-        writeLocks: writeLocks.size,
+        database: 'MongoDB',
         timestamp: Date.now(),
-        version: '3.0-secure'
+        version: '4.0-mongodb'
     });
 });
 
@@ -842,23 +821,17 @@ app.get('/api/karaoke/:userId', async (req, res) => {
             return res.json({ success: false, message: 'Invalid user ID' });
         }
         
-        const files = await fs.readdir(DATA_DIR);
-        const messageFiles = files.filter(f => f.startsWith('messages_') && f.endsWith('.json'));
+        const dbRecordings = await messageOperations.getKaraokeRecordings(userId);
         
-        const karaokeMessages = [];
-        
-        for (const file of messageFiles) {
-            const messagesData = await readJSON(file);
-            if (messagesData && messagesData.messages) {
-                const userKaraoke = messagesData.messages.filter(m => 
-                    m.type === 'audio' && 
-                    (m.senderId === userId || m.receiverId === userId)
-                );
-                karaokeMessages.push(...userKaraoke);
-            }
-        }
-        
-        karaokeMessages.sort((a, b) => b.timestamp - a.timestamp);
+        const karaokeMessages = dbRecordings.map(msg => ({
+            id: msg.messageId,
+            senderId: msg.senderId,
+            receiverId: msg.receiverId,
+            content: msg.content,
+            type: msg.type,
+            timestamp: msg.timestamp,
+            status: msg.status
+        }));
         
         res.json({
             success: true,
@@ -884,7 +857,6 @@ app.get('/api/youtube/search', async (req, res) => {
 
         console.log('🔍 YouTube search request:', query);
 
-        // FIXED: Check if API key exists
         if (!YOUTUBE_API_KEY) {
             console.error('❌ YouTube API key not configured');
             return res.json({
@@ -994,14 +966,12 @@ app.get('/api/youtube/search', async (req, res) => {
 // AUTHENTICATION ROUTES
 // ==========================================
 
-// Sign Up Route
 app.post('/api/auth/signup', authLimiter, async (req, res) => {
     try {
         let { name, email, password } = req.body;
         
         console.log('📝 Signup request:', { name, email });
         
-        // Validation
         if (!name || !email || !password) {
             return res.json({ 
                 success: false, 
@@ -1009,7 +979,6 @@ app.post('/api/auth/signup', authLimiter, async (req, res) => {
             });
         }
         
-        // Sanitize inputs
         name = sanitizeInput(name);
         email = email.toLowerCase().trim();
         
@@ -1020,7 +989,6 @@ app.post('/api/auth/signup', authLimiter, async (req, res) => {
             });
         }
         
-        // Validate email using validator library
         if (!validator.isEmail(email)) {
             return res.json({ 
                 success: false, 
@@ -1035,27 +1003,17 @@ app.post('/api/auth/signup', authLimiter, async (req, res) => {
             });
         }
         
-        // Check if email already exists
-        const files = await fs.readdir(DATA_DIR);
-        const userFiles = files.filter(f => f.startsWith('user_') && f.endsWith('.json'));
-        
-        for (const file of userFiles) {
-            const userData = await readJSON(file);
-            if (userData && userData.email && userData.email.toLowerCase() === email) {
-                return res.json({ 
-                    success: false, 
-                    message: 'Email already registered' 
-                });
-            }
+        const existingUser = await userOperations.getUserByEmail(email);
+        if (existingUser) {
+            return res.json({ 
+                success: false, 
+                message: 'Email already registered' 
+            });
         }
         
-        // Generate unique user ID
         const userId = await generateUniqueUserId();
-        
-        // Hash password with bcrypt
         const hashedPassword = await hashPassword(password);
         
-        // Create user object
         const user = {
             id: userId,
             username: name,
@@ -1065,18 +1023,20 @@ app.post('/api/auth/signup', authLimiter, async (req, res) => {
             createdAt: Date.now()
         };
         
-        // Save user
-        const saved = await writeJSON(`user_${userId}.json`, user);
+        const savedUser = await userOperations.createUser(user);
         
-        if (saved) {
+        if (savedUser) {
             console.log(`✅ New user registered: ${userId} (${name})`);
-            
-            // Return user without password
-            const { password: _, ...userWithoutPassword } = user;
             
             res.json({ 
                 success: true, 
-                user: userWithoutPassword,
+                user: {
+                    id: savedUser.userId,
+                    username: savedUser.username,
+                    email: savedUser.email,
+                    profilePhoto: savedUser.profilePhoto,
+                    createdAt: savedUser.createdAt
+                },
                 message: 'Account created successfully' 
             });
         } else {
@@ -1095,7 +1055,6 @@ app.post('/api/auth/signup', authLimiter, async (req, res) => {
     }
 });
 
-// Login Route
 app.post('/api/auth/login', authLimiter, async (req, res) => {
     try {
         let { identifier, password } = req.body;
@@ -1111,33 +1070,14 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         
         identifier = identifier.trim();
         
-        // Search for user by ID or username or email
-        const files = await fs.readdir(DATA_DIR);
-        const userFiles = files.filter(f => f.startsWith('user_') && f.endsWith('.json'));
-        
         let foundUser = null;
         
-        // Check if identifier is a 4-digit ID
         if (/^\d{4}$/.test(identifier)) {
-            // Search by ID
-            const userData = await readJSON(`user_${identifier}.json`);
-            if (userData) {
-                foundUser = userData;
-            }
+            foundUser = await userOperations.getUserById(identifier);
+        } else if (validator.isEmail(identifier)) {
+            foundUser = await userOperations.getUserByEmail(identifier);
         } else {
-            // Search by username or email
-            for (const file of userFiles) {
-                const userData = await readJSON(file);
-                if (userData) {
-                    const matchUsername = userData.username && userData.username.toLowerCase() === identifier.toLowerCase();
-                    const matchEmail = userData.email && userData.email.toLowerCase() === identifier.toLowerCase();
-                    
-                    if (matchUsername || matchEmail) {
-                        foundUser = userData;
-                        break;
-                    }
-                }
-            }
+            foundUser = await userOperations.getUserByUsername(identifier);
         }
         
         if (!foundUser) {
@@ -1149,26 +1089,17 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         
         // Handle legacy users (no password field)
         if (!foundUser.password) {
-            console.log('⚠️ Legacy user detected:', foundUser.id);
+            console.log('⚠️ Legacy user detected:', foundUser.userId);
             
-            // Set password for legacy user
             const hashedPassword = await hashPassword(password);
-            foundUser.password = hashedPassword;
-            foundUser.email = foundUser.email || `user${foundUser.id}@legacy.local`;
-            foundUser.migratedAt = Date.now();
+            await userOperations.updateUser(foundUser.userId, {
+                password: hashedPassword,
+                email: foundUser.email || `user${foundUser.userId}@legacy.local`,
+                migratedAt: Date.now()
+            });
             
-            const saved = await writeJSON(`user_${foundUser.id}.json`, foundUser);
-            
-            if (saved) {
-                console.log('✅ Legacy user migrated:', foundUser.id);
-            } else {
-                return res.json({ 
-                    success: false, 
-                    message: 'Failed to update user. Please try again.' 
-                });
-            }
+            console.log('✅ Legacy user migrated:', foundUser.userId);
         } else {
-            // Verify password for regular users using bcrypt
             const isPasswordValid = await verifyPassword(password, foundUser.password);
             
             if (!isPasswordValid) {
@@ -1179,18 +1110,21 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
             }
         }
         
-        console.log(`✅ User logged in: ${foundUser.id} (${foundUser.username})`);
+        console.log(`✅ User logged in: ${foundUser.userId} (${foundUser.username})`);
         
-        // Update last login time
-        foundUser.lastLogin = Date.now();
-        await writeJSON(`user_${foundUser.id}.json`, foundUser);
-        
-        // Return user without password
-        const { password: _, ...userWithoutPassword } = foundUser;
+        await userOperations.updateUser(foundUser.userId, {
+            lastLogin: Date.now()
+        });
         
         res.json({ 
             success: true, 
-            user: userWithoutPassword,
+            user: {
+                id: foundUser.userId,
+                username: foundUser.username,
+                email: foundUser.email,
+                profilePhoto: foundUser.profilePhoto,
+                createdAt: foundUser.createdAt
+            },
             message: 'Login successful' 
         });
         
@@ -1203,7 +1137,6 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     }
 });
 
-// Check if email exists
 app.post('/api/auth/check-email', async (req, res) => {
     try {
         let { email } = req.body;
@@ -1214,17 +1147,9 @@ app.post('/api/auth/check-email', async (req, res) => {
         
         email = email.toLowerCase().trim();
         
-        const files = await fs.readdir(DATA_DIR);
-        const userFiles = files.filter(f => f.startsWith('user_') && f.endsWith('.json'));
+        const user = await userOperations.getUserByEmail(email);
         
-        for (const file of userFiles) {
-            const userData = await readJSON(file);
-            if (userData && userData.email && userData.email.toLowerCase() === email) {
-                return res.json({ exists: true });
-            }
-        }
-        
-        res.json({ exists: false });
+        res.json({ exists: !!user });
         
     } catch (error) {
         console.error('❌ Check email error:', error);
@@ -1232,7 +1157,6 @@ app.post('/api/auth/check-email', async (req, res) => {
     }
 });
 
-// Logout Route
 app.post('/api/auth/logout', async (req, res) => {
     try {
         const { userId } = req.body;
@@ -1240,7 +1164,6 @@ app.post('/api/auth/logout', async (req, res) => {
         if (userId && activeUsers.has(userId)) {
             activeUsers.delete(userId);
             
-            // Notify others that user is offline
             io.emit('user_status', { userId, status: 'offline' });
             
             console.log(`👋 User logged out: ${userId}`);
@@ -1254,41 +1177,20 @@ app.post('/api/auth/logout', async (req, res) => {
     }
 });
 
-// Migrate all legacy users (call this once after deployment)
-app.post('/api/admin/migrate-legacy-users', async (req, res) => {
+// Migration endpoint
+app.post('/api/admin/migrate-from-files', async (req, res) => {
     try {
-        const files = await fs.readdir(DATA_DIR);
-        const userFiles = files.filter(f => f.startsWith('user_') && f.endsWith('.json'));
+        const path = require('path');
+        const DATA_DIR = path.join(__dirname, 'data');
         
-        let migratedCount = 0;
-        let alreadyMigratedCount = 0;
+        console.log('🔄 Starting migration from files...');
         
-        for (const file of userFiles) {
-            const userData = await readJSON(file);
-            
-            if (userData && !userData.password) {
-                // Legacy user - add default password and email
-                const hashedPassword = await hashPassword('default123'); // Default password
-                userData.password = hashedPassword;
-                userData.email = userData.email || `user${userData.id}@legacy.local`;
-                
-                const saved = await writeJSON(file, userData);
-                
-                if (saved) {
-                    migratedCount++;
-                    console.log(`✅ Migrated user: ${userData.id}`);
-                }
-            } else if (userData && userData.password) {
-                alreadyMigratedCount++;
-            }
-        }
+        const result = await migrateFromFiles(DATA_DIR);
         
         res.json({
             success: true,
             message: 'Migration complete',
-            migrated: migratedCount,
-            alreadyMigrated: alreadyMigratedCount,
-            total: userFiles.length
+            migrated: result
         });
         
     } catch (error) {
@@ -1305,25 +1207,31 @@ app.post('/api/admin/migrate-legacy-users', async (req, res) => {
 // ==========================================
 
 async function startServer() {
-    await ensureDataDirectory();
-    
-    server.listen(PORT, HOST, () => {
-        console.log('\n' + '='.repeat(60));
-        console.log('  🚀 CHATTY MIRROR SERVER - SECURE VERSION');
-        console.log('='.repeat(60));
-        console.log(`  ✅ Server: http://localhost:${PORT}`);
-        console.log(`  ✅ Version: 3.0 (Secure)`);
-        console.log(`  🔒 Features: bcrypt, rate limiting, input validation`);
-        console.log(`  🎤 Karaoke: Text, Images, Videos, Files, Audio`);
-        console.log('='.repeat(60));
-        console.log('\n  ⚠️  SECURITY REMINDERS:');
-        console.log('  - Set YOUTUBE_API_KEY in environment variables');
-        console.log('  - Set CLIENT_URL to your frontend domain');
-        console.log('  - Never commit API keys to version control');
-        console.log('  - Consider using a real database for production');
-        console.log('='.repeat(60) + '\n');
-    });
+    try {
+        // Connect to MongoDB first
+        await connectDB();
+        
+        server.listen(PORT, HOST, () => {
+            console.log('\n' + '='.repeat(60));
+            console.log('  🚀 CHATTY MIRROR SERVER - MONGODB VERSION');
+            console.log('='.repeat(60));
+            console.log(`  ✅ Server: http://localhost:${PORT}`);
+            console.log(`  ✅ Version: 4.0 (MongoDB)`);
+            console.log(`  🗄️  Database: MongoDB (Persistent Storage)`);
+            console.log(`  🔒 Features: bcrypt, rate limiting, input validation`);
+            console.log(`  🎤 Karaoke: Text, Images, Videos, Files, Audio`);
+            console.log('='.repeat(60));
+            console.log('\n  ⚠️  SECURITY REMINDERS:');
+            console.log('  - Set MONGODB_URI in environment variables');
+            console.log('  - Set YOUTUBE_API_KEY in environment variables');
+            console.log('  - Set CLIENT_URL to your frontend domain');
+            console.log('  - Never commit secrets to version control');
+            console.log('='.repeat(60) + '\n');
+        });
+    } catch (error) {
+        console.error('❌ Failed to start server:', error);
+        process.exit(1);
+    }
 }
 
 startServer();
-
