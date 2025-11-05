@@ -20,10 +20,13 @@ const {
 const app = express();
 const server = http.createServer(app);
 
-// CORS Configuration
 const io = socketIO(server, {
     cors: {
-        origin: process.env.CLIENT_URL || "http://localhost:3001",
+        origin: [
+            "http://localhost:3001",
+            "https://your-frontend-app.onrender.com",  // Replace with YOUR frontend URL
+            process.env.CLIENT_URL
+        ].filter(Boolean),
         methods: ["GET", "POST"],
         credentials: true
     },
@@ -38,7 +41,11 @@ const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
 
 app.use(cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3001",
+    origin: [
+        "http://localhost:3001",
+        "https://your-frontend-app.onrender.com",  // Replace with YOUR frontend URL
+        process.env.CLIENT_URL
+    ].filter(Boolean),
     credentials: true
 }));
 
