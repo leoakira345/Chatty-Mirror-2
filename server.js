@@ -351,9 +351,52 @@ io.on('connection', (socket) => {
     // Replace your existing call signaling section with this:
 
 // ==========================================
-// ==========================================
-// WEBRTC CALL SIGNALING
-// ==========================================
+    // WEBRTC CALL SIGNALING
+    // ==========================================
+// NEW: Handle call initiation (notification to receiver)
+
+socket.on('initiate_call', (data) => {
+    const { callerId, receiverId, callerName, callType } = data;
+    
+    console.log(`📞 Call initiation: ${callerId} -> ${receiverId} (${callType})`);
+    
+    const receiverSocketId = activeUsers.get(receiverId);
+    
+    if (receiverSocketId) {
+        const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+        if (receiverSocket) {
+            console.log(`✅ Notifying receiver ${receiverId} about incoming call`);
+            
+            receiverSocket.emit('incoming_call', {
+                callerId: callerId,
+                callerName: callerName,
+                callType: callType
+            });
+        } else {
+            console.log(`⚠️ Receiver socket not found for ${receiverId}`);
+            socket.emit('call:declined', { reason: 'User not available' });
+        }
+    } else {
+        console.log(`⚠️ Receiver ${receiverId} is offline`);
+        socket.emit('call:declined', { reason: 'User is offline' });
+    }
+});
+
+// Handle call rejection (when user clicks decline)
+socket.on('call_rejected', (data) => {
+    const { callerId, receiverId } = data;
+    
+    console.log(`❌ Call rejected: ${receiverId} declined call from ${callerId}`);
+    
+    const callerSocketId = activeUsers.get(callerId);
+    if (callerSocketId) {
+        const callerSocket = io.sockets.sockets.get(callerSocketId);
+        if (callerSocket) {
+            callerSocket.emit('call:declined', { reason: 'Call declined' });
+            console.log(`✅ Notified caller ${callerId} about rejection`);
+        }
+    }
+});
 
 socket.on('call:offer', (data) => {
     const { to, from, offer, isVideoCall } = data;
