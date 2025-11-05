@@ -1,4 +1,4 @@
-// WebRTC Call Manager with Sound Effects
+// WebRTC Call Manager with Sound Effects - FIXED VERSION
 class CallManager {
     constructor() {
         this.socket = null;
@@ -14,6 +14,7 @@ class CallManager {
         this.callStartTime = null;
         this.timerInterval = null;
         this.currentCamera = 'user';
+        this.pendingOffer = null; // Store pending offer for receiver
         
         // Audio elements
         this.outgoingRingtone = null;
@@ -54,6 +55,7 @@ class CallManager {
         this.socket.on('call:offer', (data) => this.handleOffer(data));
         this.socket.on('call:answer', (data) => this.handleAnswer(data));
         this.socket.on('call:ice-candidate', (data) => this.handleIceCandidate(data));
+        this.socket.on('call:accepted', (data) => this.handleCallAccepted(data));
         this.socket.on('call:ended', () => this.handleCallEnded());
         this.socket.on('call:declined', () => this.handleCallDeclined());
 
@@ -65,7 +67,6 @@ class CallManager {
         // Outgoing call ringtone (for caller)
         this.outgoingRingtone = new Audio();
         this.outgoingRingtone.loop = true;
-        // Using a simple tone generator or you can use a URL to an audio file
         this.outgoingRingtone.src = this.generateOutgoingTone();
         
         // Incoming call ringtones (for receiver) - random selection
@@ -76,18 +77,15 @@ class CallManager {
             this.generateIncomingTone4()
         ];
         
-        // Select random ringtone
         const randomIndex = Math.floor(Math.random() * incomingRingtones.length);
         this.incomingRingtone = new Audio();
         this.incomingRingtone.loop = true;
         this.incomingRingtone.src = incomingRingtones[randomIndex];
 
-        // Call end sound
         this.callEndSound = new Audio();
         this.callEndSound.src = this.generateCallEndSound();
     }
 
-    // Generate outgoing ringtone (simple beep pattern)
     generateOutgoingTone() {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const duration = 2;
@@ -95,10 +93,9 @@ class CallManager {
         const buffer = audioContext.createBuffer(1, duration * sampleRate, sampleRate);
         const data = buffer.getChannelData(0);
         
-        // Create beep pattern: 0.4s on, 0.2s off, 0.4s on, 1.0s off
         for (let i = 0; i < data.length; i++) {
             const time = i / sampleRate;
-            const freq = 440; // A4 note
+            const freq = 440;
             
             if ((time < 0.4) || (time >= 0.6 && time < 1.0)) {
                 data[i] = Math.sin(2 * Math.PI * freq * time) * 0.3;
@@ -107,11 +104,9 @@ class CallManager {
             }
         }
         
-        // Convert to WAV and create blob URL
         return this.bufferToWave(buffer, sampleRate);
     }
 
-    // Generate incoming ringtone 1 (Classic phone ring)
     generateIncomingTone1() {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const duration = 4;
@@ -124,13 +119,11 @@ class CallManager {
             const cycle = time % 4;
             
             if (cycle < 2) {
-                // Ring for 2 seconds
                 const freq1 = 440;
                 const freq2 = 480;
                 data[i] = (Math.sin(2 * Math.PI * freq1 * time) + 
                           Math.sin(2 * Math.PI * freq2 * time)) * 0.25;
             } else {
-                // Silence for 2 seconds
                 data[i] = 0;
             }
         }
@@ -138,7 +131,6 @@ class CallManager {
         return this.bufferToWave(buffer, sampleRate);
     }
 
-    // Generate incoming ringtone 2 (Ascending tones)
     generateIncomingTone2() {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const duration = 3;
@@ -146,7 +138,7 @@ class CallManager {
         const buffer = audioContext.createBuffer(1, duration * sampleRate, sampleRate);
         const data = buffer.getChannelData(0);
         
-        const frequencies = [523, 587, 659, 698]; // C5, D5, E5, F5
+        const frequencies = [523, 587, 659, 698];
         
         for (let i = 0; i < data.length; i++) {
             const time = i / sampleRate;
@@ -163,7 +155,6 @@ class CallManager {
         return this.bufferToWave(buffer, sampleRate);
     }
 
-    // Generate incoming ringtone 3 (Two-tone alert)
     generateIncomingTone3() {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const duration = 2.5;
@@ -187,7 +178,6 @@ class CallManager {
         return this.bufferToWave(buffer, sampleRate);
     }
 
-    // Generate incoming ringtone 4 (Triple beep)
     generateIncomingTone4() {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const duration = 3;
@@ -210,7 +200,6 @@ class CallManager {
         return this.bufferToWave(buffer, sampleRate);
     }
 
-    // Generate call end sound (descending tone)
     generateCallEndSound() {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const duration = 0.5;
@@ -225,7 +214,7 @@ class CallManager {
             const time = i / sampleRate;
             const progress = time / duration;
             const freq = startFreq - (startFreq - endFreq) * progress;
-            const envelope = 1 - progress; // Fade out
+            const envelope = 1 - progress;
             
             data[i] = Math.sin(2 * Math.PI * freq * time) * envelope * 0.4;
         }
@@ -233,7 +222,6 @@ class CallManager {
         return this.bufferToWave(buffer, sampleRate);
     }
 
-    // Convert AudioBuffer to WAV format
     bufferToWave(buffer, sampleRate) {
         const length = buffer.length * 2;
         const arrayBuffer = new ArrayBuffer(44 + length);
@@ -241,7 +229,6 @@ class CallManager {
         const channels = 1;
         const data = buffer.getChannelData(0);
         
-        // WAV header
         this.writeString(view, 0, 'RIFF');
         view.setUint32(4, 36 + length, true);
         this.writeString(view, 8, 'WAVE');
@@ -256,7 +243,6 @@ class CallManager {
         this.writeString(view, 36, 'data');
         view.setUint32(40, length, true);
         
-        // Write audio data
         let offset = 44;
         for (let i = 0; i < data.length; i++) {
             const sample = Math.max(-1, Math.min(1, data[i]));
@@ -304,22 +290,16 @@ class CallManager {
     }
 
     setupUI() {
-        // Incoming call buttons
         document.getElementById('acceptBtn').addEventListener('click', () => this.acceptCall());
         document.getElementById('declineBtn').addEventListener('click', () => this.declineCall());
-
-        // Call control buttons
         document.getElementById('toggleVideoBtn').addEventListener('click', () => this.toggleVideo());
         document.getElementById('toggleAudioBtn').addEventListener('click', () => this.toggleAudio());
         document.getElementById('switchCameraBtn').addEventListener('click', () => this.switchCamera());
         document.getElementById('endCallBtn').addEventListener('click', () => this.endCall());
-
-        // Close button
         document.getElementById('closeCallBtn').addEventListener('click', () => {
             window.close();
         });
 
-        // Set caller info
         document.getElementById('callerName').textContent = this.friendName;
         document.getElementById('callerInitial').textContent = this.friendName.charAt(0).toUpperCase();
         document.getElementById('remoteUserName').textContent = this.friendName;
@@ -330,11 +310,9 @@ class CallManager {
         const type = new URLSearchParams(window.location.search).get('callType');
         
         if (type === 'outgoing') {
-            // Outgoing call - start immediately and play ringtone
             this.playOutgoingRingtone();
             await this.startCall();
         } else {
-            // Incoming call - show incoming screen and play ringtone
             this.playIncomingRingtone();
             document.getElementById('incomingCallScreen').style.display = 'flex';
             document.getElementById('callType').textContent = this.isVideoCall ? 'Video Call' : 'Voice Call';
@@ -343,19 +321,17 @@ class CallManager {
 
     async startCall() {
         try {
-            // Get user media
+            console.log('🔵 Starting outgoing call...');
+            
             await this.getUserMedia();
-
-            // Show active call screen
             this.showActiveCallScreen();
-
-            // Create peer connection
             this.createPeerConnection();
 
-            // Create and send offer
             const offer = await this.peerConnection.createOffer();
             await this.peerConnection.setLocalDescription(offer);
 
+            console.log('📤 Sending offer to:', this.friendId);
+            
             this.socket.emit('call:offer', {
                 to: this.friendId,
                 from: this.userId,
@@ -373,23 +349,42 @@ class CallManager {
 
     async acceptCall() {
         try {
-            // Stop incoming ringtone
+            console.log('🟢 Accepting call...');
+            
             this.stopRingtones();
-
-            // Get user media
+            
             await this.getUserMedia();
-
-            // Hide incoming screen, show active screen
+            
             document.getElementById('incomingCallScreen').style.display = 'none';
             this.showActiveCallScreen();
-
             document.getElementById('callStatus').textContent = 'Connecting...';
 
-            // Notify the caller that call was accepted
+            // Create peer connection BEFORE processing the offer
+            this.createPeerConnection();
+            
+            // Process the pending offer
+            if (this.pendingOffer) {
+                console.log('📥 Processing pending offer...');
+                await this.peerConnection.setRemoteDescription(new RTCSessionDescription(this.pendingOffer));
+                
+                const answer = await this.peerConnection.createAnswer();
+                await this.peerConnection.setLocalDescription(answer);
+
+                console.log('📤 Sending answer to:', this.friendId);
+                
+                this.socket.emit('call:answer', {
+                    to: this.friendId,
+                    from: this.userId,
+                    answer: answer
+                });
+            }
+
+            // Notify caller that call was accepted
             this.socket.emit('call:accepted', {
                 to: this.friendId,
                 from: this.userId
             });
+            
         } catch (error) {
             console.error('Error accepting call:', error);
             this.stopRingtones();
@@ -398,12 +393,17 @@ class CallManager {
     }
 
     declineCall() {
+        console.log('❌ Declining call');
         this.stopRingtones();
+        
         this.socket.emit('call:declined', {
             to: this.friendId,
             from: this.userId
         });
-        window.close();
+        
+        setTimeout(() => {
+            window.close();
+        }, 500);
     }
 
     async getUserMedia() {
@@ -419,6 +419,7 @@ class CallManager {
         try {
             this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             document.getElementById('localVideo').srcObject = this.localStream;
+            console.log('✅ Got user media');
         } catch (error) {
             console.error('Error accessing media devices:', error);
             throw error;
@@ -426,22 +427,26 @@ class CallManager {
     }
 
     createPeerConnection() {
+        console.log('🔗 Creating peer connection...');
+        
         this.peerConnection = new RTCPeerConnection(this.iceServers);
 
         // Add local stream tracks
         this.localStream.getTracks().forEach(track => {
             this.peerConnection.addTrack(track, this.localStream);
+            console.log('➕ Added track:', track.kind);
         });
 
         // Handle remote stream
         this.peerConnection.ontrack = (event) => {
+            console.log('📺 Received remote track:', event.track.kind);
+            
             if (!this.remoteStream) {
                 this.remoteStream = new MediaStream();
                 document.getElementById('remoteVideo').srcObject = this.remoteStream;
             }
             this.remoteStream.addTrack(event.track);
             
-            // Hide placeholder when video starts
             if (event.track.kind === 'video') {
                 document.getElementById('remoteVideoPlaceholder').style.display = 'none';
             }
@@ -450,6 +455,7 @@ class CallManager {
         // Handle ICE candidates
         this.peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
+                console.log('🧊 Sending ICE candidate');
                 this.socket.emit('call:ice-candidate', {
                     to: this.friendId,
                     candidate: event.candidate
@@ -459,7 +465,8 @@ class CallManager {
 
         // Handle connection state
         this.peerConnection.onconnectionstatechange = () => {
-            console.log('Connection state:', this.peerConnection.connectionState);
+            console.log('🔄 Connection state:', this.peerConnection.connectionState);
+            
             if (this.peerConnection.connectionState === 'connected') {
                 this.onCallConnected();
             } else if (this.peerConnection.connectionState === 'disconnected' || 
@@ -467,20 +474,23 @@ class CallManager {
                 this.handleCallEnded();
             }
         };
+
+        // Handle ICE connection state
+        this.peerConnection.oniceconnectionstatechange = () => {
+            console.log('❄️ ICE connection state:', this.peerConnection.iceConnectionState);
+        };
     }
 
     async handleOffer(data) {
         try {
-            this.createPeerConnection();
-            await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+            console.log('📥 Received offer from:', data.from);
             
-            const answer = await this.peerConnection.createAnswer();
-            await this.peerConnection.setLocalDescription(answer);
-
-            this.socket.emit('call:answer', {
-                to: data.from,
-                answer: answer
-            });
+            // Store the offer to process after user accepts
+            this.pendingOffer = data.offer;
+            
+            // The offer will be processed when user clicks accept
+            // Don't create peer connection here yet!
+            
         } catch (error) {
             console.error('Error handling offer:', error);
         }
@@ -488,9 +498,14 @@ class CallManager {
 
     async handleAnswer(data) {
         try {
-            // Stop outgoing ringtone when call is answered
+            console.log('📥 Received answer');
+            
             this.stopRingtones();
-            await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+            
+            if (this.peerConnection) {
+                await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                console.log('✅ Set remote description (answer)');
+            }
         } catch (error) {
             console.error('Error handling answer:', error);
         }
@@ -498,7 +513,8 @@ class CallManager {
 
     async handleIceCandidate(data) {
         try {
-            if (this.peerConnection) {
+            if (this.peerConnection && data.candidate) {
+                console.log('🧊 Adding ICE candidate');
                 await this.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
             }
         } catch (error) {
@@ -506,8 +522,15 @@ class CallManager {
         }
     }
 
+    handleCallAccepted(data) {
+        console.log('✅ Call accepted by:', data.from);
+        this.stopRingtones();
+        document.getElementById('callStatus').textContent = 'Connecting...';
+    }
+
     onCallConnected() {
-        // Stop all ringtones
+        console.log('✅ Call connected!');
+        
         this.stopRingtones();
         
         document.getElementById('callStatus').style.display = 'none';
@@ -537,7 +560,6 @@ class CallManager {
                 this.isVideoEnabled = !this.isVideoEnabled;
                 videoTrack.enabled = this.isVideoEnabled;
 
-                // Update button UI
                 const videoBtn = document.getElementById('toggleVideoBtn');
                 document.getElementById('videoOnIcon').style.display = this.isVideoEnabled ? 'block' : 'none';
                 document.getElementById('videoOffIcon').style.display = this.isVideoEnabled ? 'none' : 'block';
@@ -558,7 +580,6 @@ class CallManager {
                 this.isAudioEnabled = !this.isAudioEnabled;
                 audioTrack.enabled = this.isAudioEnabled;
 
-                // Update button UI
                 const audioBtn = document.getElementById('toggleAudioBtn');
                 document.getElementById('audioOnIcon').style.display = this.isAudioEnabled ? 'block' : 'none';
                 document.getElementById('audioOffIcon').style.display = this.isAudioEnabled ? 'none' : 'block';
@@ -576,16 +597,13 @@ class CallManager {
         if (!this.isVideoCall || !this.localStream) return;
 
         try {
-            // Stop current video track
             const videoTrack = this.localStream.getVideoTracks()[0];
             if (videoTrack) {
                 videoTrack.stop();
             }
 
-            // Switch camera
             this.currentCamera = this.currentCamera === 'user' ? 'environment' : 'user';
 
-            // Get new video stream
             const newStream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     facingMode: this.currentCamera,
@@ -594,15 +612,12 @@ class CallManager {
                 }
             });
 
-            // Replace video track
             const newVideoTrack = newStream.getVideoTracks()[0];
             this.localStream.removeTrack(videoTrack);
             this.localStream.addTrack(newVideoTrack);
 
-            // Update local video
             document.getElementById('localVideo').srcObject = this.localStream;
 
-            // Update peer connection
             if (this.peerConnection) {
                 const sender = this.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
                 if (sender) {
@@ -615,52 +630,59 @@ class CallManager {
     }
 
     endCall() {
+        console.log('📞 Ending call');
+        
         this.playCallEndSound();
         this.stopRingtones();
+        
         this.socket.emit('call:ended', {
             to: this.friendId,
             from: this.userId
         });
+        
         this.cleanupCall();
         
-        // Delay showing ended screen to let sound play
         setTimeout(() => {
             this.showCallEndedScreen();
         }, 500);
     }
 
     handleCallEnded() {
+        console.log('📞 Call ended by remote');
+        
         this.playCallEndSound();
         this.stopRingtones();
         this.cleanupCall();
         
-        // Delay showing ended screen to let sound play
         setTimeout(() => {
             this.showCallEndedScreen();
         }, 500);
     }
 
     handleCallDeclined() {
+        console.log('❌ Call declined by remote');
+        
         this.stopRingtones();
+        this.cleanupCall();
+        
         alert('Call declined');
-        window.close();
+        
+        setTimeout(() => {
+            window.close();
+        }, 500);
     }
 
     cleanupCall() {
-        // Stop ringtones
         this.stopRingtones();
 
-        // Stop timer
         if (this.timerInterval) {
             clearInterval(this.timerInterval);
         }
 
-        // Stop all tracks
         if (this.localStream) {
             this.localStream.getTracks().forEach(track => track.stop());
         }
 
-        // Close peer connection
         if (this.peerConnection) {
             this.peerConnection.close();
         }
@@ -670,7 +692,6 @@ class CallManager {
         document.getElementById('activeCallScreen').style.display = 'none';
         document.getElementById('callEndedScreen').style.display = 'flex';
 
-        // Show call duration
         if (this.callStartTime) {
             const elapsed = Math.floor((Date.now() - this.callStartTime) / 1000);
             const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
@@ -682,7 +703,6 @@ class CallManager {
     }
 }
 
-// Initialize call manager when page loads
 window.addEventListener('DOMContentLoaded', () => {
     new CallManager();
 });
