@@ -230,7 +230,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupImageModal();
     setupKaraokeModal();
     setupPaintModal(); // Add this line
-    setupLogoutButton(); // ✅ ADD THIS LINE
+    setupLogoutButton();
+    setupCallButtons(); // ✅ ADD CALL FUNCTIONALITY
 });
 
 async function initializeApp() {
@@ -444,6 +445,54 @@ function initializeSocket() {
             renderMessages();
         }
     });
+
+    // ==========================================
+    // INCOMING CALL HANDLER - NEW
+    // ==========================================
+    socket.on('incoming_call', (data) => {
+    console.log('📞 Incoming call from:', data.callerId, 'Type:', data.callType);
+    
+    const caller = friends.find(f => f.id === data.callerId);
+    const callerName = caller ? caller.username : (data.callerName || 'Someone');
+    
+    const callType = data.callType === 'video' ? '📹 Video' : '📞 Voice';
+    
+    // Show browser confirmation dialog
+    const answer = confirm(`${callType} Call from ${callerName}\n\nAnswer call?`);
+    
+    if (answer) {
+        console.log('✅ User accepted the call');
+        
+        // Open call window for incoming call
+        const callWindow = window.open(
+            `call.html?userId=${currentUser.id}&friendId=${data.callerId}&friendName=${encodeURIComponent(callerName)}&type=${data.callType}&callType=incoming`,
+            'CallWindow',
+            'width=800,height=600,resizable=yes,scrollbars=yes'
+        );
+        
+        if (!callWindow) {
+            alert('Failed to open call window. Please allow pop-ups.');
+            socket.emit('call_rejected', {
+                callerId: data.callerId,
+                receiverId: currentUser.id
+            });
+        }
+    } else {
+        console.log('❌ User declined the call');
+        
+        // Notify caller that call was rejected
+        socket.emit('call_rejected', {
+            callerId: data.callerId,
+            receiverId: currentUser.id
+        });
+    }
+});
+
+// Add handler for when call fails to connect
+socket.on('call_failed', (data) => {
+    console.log('❌ Call failed:', data.reason);
+    alert(`Call failed: ${data.reason}`);
+});
 
     socket.on('connect_error', (error) => {
         console.error('❌ Connection error:', error.message);
@@ -1460,7 +1509,6 @@ function setupKaraokeModal() {
     stopRecordBtn.addEventListener('click', stopRecording);
     sendRecordingBtn.addEventListener('click', sendKaraokeRecording);
 
-    // Add download button listener
     const downloadRecordingBtn = document.getElementById('downloadRecordingBtn');
     if (downloadRecordingBtn) {
         downloadRecordingBtn.addEventListener('click', downloadKaraokeRecording);
@@ -1515,10 +1563,10 @@ function closeKaraokeModal() {
     }
     
     cleanupStreams();
-   startRecordBtn.style.display = 'inline-flex';
+    
+    startRecordBtn.style.display = 'inline-flex';
     stopRecordBtn.style.display = 'none';
     
-    // Hide download button
     const downloadBtn = document.getElementById('downloadRecordingBtn');
     if (downloadBtn) {
         downloadBtn.style.display = 'none';
@@ -1766,27 +1814,21 @@ function startCountdown() {
     }, 1000);
 }
 
-// ==========================================
-// UPDATED startRecording - NATIVE + WEB
-// ==========================================
 async function startRecording() {
     try {
         console.log('🎤 Starting karaoke recording...');
         console.log('Platform:', platform, 'Native:', isNativeApp, 'Android:', isAndroid);
         
-        // ✅ NATIVE ANDROID APP - Use internal audio capture
         if (isNativeApp && isAndroid) {
             console.log('📱 Android Native App - Using internal audio capture');
             await startNativeAndroidRecording();
             return;
         }
         
-        // ✅ WEB BROWSER OR iOS - Use existing method
         console.log('🌐 Web Browser - Using standard recording');
         
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
-        // Get microphone
         micStream = await navigator.mediaDevices.getUserMedia({
             audio: {
                 echoCancellation: false,
@@ -1800,7 +1842,6 @@ async function startRecording() {
         let finalStream;
         let recordingMode = 'mic-only';
         
-        // Desktop browser - try tab audio
         if (!isMobile) {
             try {
                 desktopStream = await navigator.mediaDevices.getDisplayMedia({
@@ -1811,7 +1852,6 @@ async function startRecording() {
 
                 const audioTracks = desktopStream.getAudioTracks();
                 if (audioTracks.length > 0) {
-                    // Mix audio
                     audioContext = new AudioContext({ sampleRate: 48000 });
                     const micSource = audioContext.createMediaStreamSource(micStream);
                     const desktopSource = audioContext.createMediaStreamSource(desktopStream);
@@ -1837,7 +1877,6 @@ async function startRecording() {
             finalStream = micStream;
         }
 
-        // Create MediaRecorder
         mediaRecorder = new MediaRecorder(finalStream, {
             mimeType: 'audio/webm;codecs=opus',
             audioBitsPerSecond: 192000
@@ -1851,12 +1890,10 @@ async function startRecording() {
         mediaRecorder.start(100);
         recordingStartTime = Date.now();
 
-        // Start YouTube
         if (youtubePlayer?.playVideo) {
             youtubePlayer.playVideo();
         }
 
-        // Update UI
         updateRecordingUI(recordingMode);
         recordingInterval = setInterval(updateRecordingTimer, 1000);
 
@@ -1867,14 +1904,10 @@ async function startRecording() {
     }
 }
 
-// ==========================================
-// NATIVE ANDROID RECORDING - FIXED
-// ==========================================
 async function startNativeAndroidRecording() {
     try {
         console.log('📱 Starting native Android recording...');
         
-        // Access the custom plugin from Capacitor
         const InternalAudioCapture = window.Capacitor.Plugins.InternalAudioCapture;
         
         if (!InternalAudioCapture) {
@@ -1883,7 +1916,6 @@ async function startNativeAndroidRecording() {
         
         console.log('✅ Plugin found, requesting permission...');
         
-        // Request permission (this will show Android system dialogs)
         const permResult = await InternalAudioCapture.requestPermission();
         
         if (!permResult.granted) {
@@ -1892,18 +1924,15 @@ async function startNativeAndroidRecording() {
         
         console.log('✅ Permission granted, starting recording...');
         
-        // Start recording
         await InternalAudioCapture.startRecording();
         
         nativeRecordingActive = true;
         recordingStartTime = Date.now();
         
-        // Start YouTube video
         if (youtubePlayer?.playVideo) {
             youtubePlayer.playVideo();
         }
         
-        // Update UI
         startRecordBtn.style.display = 'none';
         stopRecordBtn.style.display = 'inline-flex';
         recordingIndicator.style.display = 'flex';
@@ -1924,9 +1953,6 @@ async function startNativeAndroidRecording() {
     }
 }
 
-// ==========================================
-// UPDATE UI HELPER
-// ==========================================
 function updateRecordingUI(mode) {
     startRecordBtn.style.display = 'none';
     stopRecordBtn.style.display = 'inline-flex';
@@ -1956,13 +1982,9 @@ function updateRecordingTimer() {
     recordingTimer.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-// ==========================================
-// STOP RECORDING - HANDLES NATIVE & WEB
-// ==========================================
 async function stopRecording() {
     console.log('⏹️ Stopping recording...');
     
-    // NATIVE ANDROID
     if (nativeRecordingActive) {
         try {
             const InternalAudioCapture = window.Capacitor.Plugins.InternalAudioCapture;
@@ -1977,7 +1999,6 @@ async function stopRecording() {
             console.log('✅ Recording stopped successfully');
             console.log('📁 File size:', (result.size / 1024).toFixed(2), 'KB');
             
-            // Convert base64 to blob
             const base64Data = result.base64;
             const byteCharacters = atob(base64Data);
             const byteNumbers = new Array(byteCharacters.length);
@@ -1989,12 +2010,10 @@ async function stopRecording() {
             
             nativeRecordingActive = false;
             
-            // Show audio preview
             const audioUrl = URL.createObjectURL(recordedBlob);
             recordedAudio.src = audioUrl;
-           recordedAudioPreview.style.display = 'block';
+            recordedAudioPreview.style.display = 'block';
             
-            // Enable download button
             const downloadBtn = document.getElementById('downloadRecordingBtn');
             if (downloadBtn) {
                 downloadBtn.style.display = 'inline-flex';
@@ -2003,15 +2022,11 @@ async function stopRecording() {
             
             console.log('✅ Recording ready:', (recordedBlob.size / 1024).toFixed(2), 'KB');
             
-            console.log('✅ Recording ready:', (recordedBlob.size / 1024).toFixed(2), 'KB');
-            
         } catch (error) {
             console.error('❌ Error stopping native recording:', error);
             alert('Failed to stop recording: ' + error.message);
         }
-    } 
-    // WEB BROWSER
-    else {
+    } else {
         if (!mediaRecorder || mediaRecorder.state !== 'recording') {
             console.warn('⚠️ No active recording');
             return;
@@ -2024,7 +2039,6 @@ async function stopRecording() {
         }
     }
     
-    // Common cleanup
     if (recordingInterval) {
         clearInterval(recordingInterval);
         recordingInterval = null;
@@ -2037,12 +2051,6 @@ async function stopRecording() {
     console.log('✅ Recording stopped');
 }
 
-// ==========================================
-// WEB FALLBACK RECORDING
-// ==========================================
-// ==========================================
-// handleRecordingStop - Process recorded audio
-// ==========================================
 function handleRecordingStop() {
     console.log('🎬 Processing recording...');
     
@@ -2061,7 +2069,6 @@ function handleRecordingStop() {
     
     recordedAudioPreview.style.display = 'block';
     
-    // Enable download button
     const downloadBtn = document.getElementById('downloadRecordingBtn');
     if (downloadBtn) {
         downloadBtn.style.display = 'inline-flex';
@@ -2073,9 +2080,6 @@ function handleRecordingStop() {
     cleanupStreams();
 }
 
-// ==========================================
-// WEB FALLBACK RECORDING
-// ==========================================
 async function startWebRecording() {
     try {
         console.log('🌐 Starting web microphone recording...');
@@ -2127,9 +2131,6 @@ async function startWebRecording() {
     }
 }
 
-// ==========================================
-// DOWNLOAD KARAOKE RECORDING
-// ==========================================
 function downloadKaraokeRecording() {
     if (!recordedBlob) {
         alert('No recording to download');
@@ -2142,7 +2143,6 @@ function downloadKaraokeRecording() {
         a.style.display = 'none';
         a.href = url;
         
-        // Generate filename with timestamp
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
         const extension = recordedBlob.type.includes('wav') ? 'wav' : 'webm';
         a.download = `Karaoke_${timestamp}.${extension}`;
@@ -2150,7 +2150,6 @@ function downloadKaraokeRecording() {
         document.body.appendChild(a);
         a.click();
         
-        // Cleanup
         setTimeout(() => {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
@@ -2163,7 +2162,6 @@ function downloadKaraokeRecording() {
     }
 }
 
-// Make function globally accessible
 window.downloadKaraokeRecording = downloadKaraokeRecording;
 
 function cleanupStreams() {
@@ -2243,43 +2241,6 @@ async function sendKaraokeRecording() {
 
             console.log('🎤 Sending karaoke:', audioData.size, 'bytes');
 
-            function downloadKaraokeRecording() {
-    if (!recordedBlob) {
-        alert('No recording to download');
-        return;
-    }
-
-    try {
-        const url = URL.createObjectURL(recordedBlob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        
-        // Generate filename with timestamp
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-        const extension = recordedBlob.type.includes('wav') ? 'wav' : 'webm';
-        a.download = `Karaoke_${timestamp}.${extension}`;
-        
-        document.body.appendChild(a);
-        a.click();
-        
-        // Cleanup
-        setTimeout(() => {
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }, 100);
-        
-        console.log('✅ Recording downloaded');
-    } catch (error) {
-        console.error('❌ Download error:', error);
-        alert('Failed to download recording');
-    }
-}
-
-// Make function globally accessible
-window.downloadKaraokeRecording = downloadKaraokeRecording;
-
-            // Add to messages array
             const newMessage = {
                 id: 'temp_' + Date.now() + Math.random().toString(36).substr(2, 9),
                 senderId: currentUser.id,
@@ -2294,7 +2255,6 @@ window.downloadKaraokeRecording = downloadKaraokeRecording;
             renderMessages();
             scrollToBottom();
 
-            // Send via socket
             socket.emit('send_message', {
                 senderId: currentUser.id,
                 receiverId: selectedFriend.id,
@@ -2304,10 +2264,8 @@ window.downloadKaraokeRecording = downloadKaraokeRecording;
                 console.log('📬 Karaoke send response:', response);
             });
 
-            // DON'T close modal - just show success
             alert('Karaoke recording sent! 🎤\n\nYou can record another or close the modal.');
             
-            // Reset send button
             sendRecordingBtn.disabled = false;
             sendRecordingBtn.innerHTML = `
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2333,11 +2291,10 @@ window.downloadKaraokeRecording = downloadKaraokeRecording;
         sendRecordingBtn.disabled = false;
     }
 }
-// ==========================================
-// ADD THESE LOGOUT FUNCTIONS TO app.js
-// Add after setupKaraokeModal() function
-// ==========================================
 
+// ==========================================
+// LOGOUT FUNCTIONS
+// ==========================================
 function setupLogoutButton() {
     const logoutBtn = document.getElementById('logoutBtn');
     
@@ -2352,7 +2309,6 @@ function setupLogoutButton() {
 }
 
 function showLogoutConfirmation() {
-    // Create modal if it doesn't exist
     let modal = document.getElementById('logoutModal');
     
     if (!modal) {
@@ -2380,7 +2336,6 @@ function showLogoutConfirmation() {
         `;
         document.body.appendChild(modal);
         
-        // Close on backdrop click
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 hideLogoutConfirmation();
@@ -2403,7 +2358,6 @@ async function performLogout() {
     
     if (!confirmBtn) return;
     
-    // Disable button
     confirmBtn.disabled = true;
     confirmBtn.innerHTML = `
         <svg class="icon animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; display: inline-block; margin-right: 0.5rem;">
@@ -2413,11 +2367,10 @@ async function performLogout() {
     `;
     
     try {
-        // Notify server with timeout
         if (currentUser && currentUser.id) {
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
                 
                 await fetch(`${API_URL}/auth/logout`, {
                     method: 'POST',
@@ -2431,24 +2384,19 @@ async function performLogout() {
                 
             } catch (error) {
                 console.warn('⚠️ Server logout notification failed (continuing anyway):', error.message);
-                // Continue with logout even if server notification fails
             }
         }
         
-        // Disconnect socket
         if (socket && socket.connected) {
             socket.disconnect();
             console.log('🔌 Socket disconnected');
         }
         
-        // Clear local storage
         localStorage.removeItem('chatty_mirror_user');
         console.log('✅ User data cleared from localStorage');
         
-        // Show success message briefly
         confirmBtn.innerHTML = '✅ Logged out!';
         
-        // Redirect to auth page after short delay
         setTimeout(() => {
             window.location.href = 'auth.html';
         }, 500);
@@ -2456,7 +2404,6 @@ async function performLogout() {
     } catch (error) {
         console.error('❌ Logout error:', error);
         
-        // Force logout anyway - always clear data and redirect
         localStorage.removeItem('chatty_mirror_user');
         console.log('🔄 Forcing logout despite error');
         
@@ -2465,42 +2412,124 @@ async function performLogout() {
         }, 500);
     }
 }
-// ==========================================
-// UPDATE THE setupEventListeners() FUNCTION
-// Add this line inside setupEventListeners()
-// ==========================================
 
-// Add this line in your existing setupEventListeners() function:
-// setupLogoutButton();
-
-// ==========================================
-// UPDATE DOMContentLoaded EVENT
-// Modify the existing DOMContentLoaded to include:
-// ==========================================
-
-// Your existing code should look like this:
-/*
-document.addEventListener('DOMContentLoaded', async () => {
-    loadYouTubeAPI();
-    await initializeApp();
-    setupEventListeners();
-    initializeEmojiPicker();
-    initializeSocket();
-    setupMobileMenu();
-    setupSettingsModal();
-    setupImageModal();
-    setupKaraokeModal();
-    setupLogoutButton(); // ADD THIS LINE
-});
-*/
-
-// Make logout functions globally accessible
 window.showLogoutConfirmation = showLogoutConfirmation;
 window.hideLogoutConfirmation = hideLogoutConfirmation;
 window.performLogout = performLogout;
 
-// Music Studio Button - Opens studio.html in new window
-document.getElementById('openMusicBtn')?.addEventListener('click', () => {
-    window.open('studio.html', 'MusicStudio', 'width=1600,height=900,resizable=yes,scrollbars=yes');
-});
+// ==========================================
+// CALL FUNCTIONALITY
+// ==========================================
+function setupCallButtons() {
+    const voiceCallBtn = document.getElementById('voiceCallBtn');
+    const videoCallBtn = document.getElementById('videoCallBtn');
+    
+    if (voiceCallBtn) {
+        voiceCallBtn.addEventListener('click', () => {
+            if (selectedFriend) {
+                startCall('audio');
+            } else {
+                alert('Please select a friend first');
+            }
+        });
+    }
+    
+    if (videoCallBtn) {
+        videoCallBtn.addEventListener('click', () => {
+            if (selectedFriend) {
+                startCall('video');
+            } else {
+                alert('Please select a friend first');
+            }
+        });
+    }
+    
+    console.log('✅ Call buttons setup complete');
+}
 
+function startCall(type) {
+    if (!selectedFriend || !currentUser) {
+        alert('Unable to start call - missing user information');
+        return;
+    }
+    
+    if (!socket || !socket.connected) {
+        alert('Not connected to server. Please check your connection.');
+        return;
+    }
+    
+    console.log(`📞 Starting ${type} call with:`, selectedFriend.username);
+    
+    // First, notify the receiver through Socket.IO
+    socket.emit('initiate_call', {
+        callerId: currentUser.id,
+        receiverId: selectedFriend.id,
+        callerName: currentUser.username,
+        callType: type
+    });
+    
+    // Then open the call window for the caller
+    const callWindow = window.open(
+        `call.html?userId=${currentUser.id}&friendId=${selectedFriend.id}&friendName=${encodeURIComponent(selectedFriend.username)}&type=${type}&callType=outgoing`,
+        'CallWindow',
+        'width=800,height=600,resizable=yes,scrollbars=yes'
+    );
+    
+    if (!callWindow) {
+        alert('Failed to open call window. Please allow pop-ups for this site.');
+    } else {
+        console.log('✅ Call window opened for outgoing call');
+    }
+}
+
+window.startCall = startCall;
+
+// ==========================================
+// PAINT MODAL FUNCTIONALITY (if you have it)
+// ==========================================
+function setupPaintModal() {
+    const paintBtn = document.getElementById('paintBtn');
+    
+    if (!paintBtn) {
+        console.log('⚠️ Paint button not found - skipping paint setup');
+        return;
+    }
+    
+    paintBtn.addEventListener('click', () => {
+        if (!selectedFriend) {
+            alert('Please select a friend first to send drawings');
+            return;
+        }
+        
+        window.open(
+            'paint.html',
+            'PaintWindow',
+            'width=1000,height=700,resizable=yes,scrollbars=yes'
+        );
+    });
+    
+    console.log('✅ Paint button setup complete');
+}
+
+// ==========================================
+// MUSIC STUDIO BUTTON
+// ==========================================
+const openMusicBtn = document.getElementById('openMusicBtn');
+if (openMusicBtn) {
+    openMusicBtn.addEventListener('click', () => {
+        window.open('studio.html', 'MusicStudio', 'width=1600,height=900,resizable=yes,scrollbars=yes');
+    });
+}
+
+// ==========================================
+// MAKE FUNCTIONS GLOBALLY ACCESSIBLE
+// ==========================================
+window.addFriend = addFriend;
+window.selectYouTubeVideo = selectYouTubeVideo;
+window.insertEmoji = insertEmoji;
+window.openImageModal = openImageModal;
+
+// ==========================================
+// END OF FILE
+// ==========================================
+console.log('✅ app.js loaded successfully');
