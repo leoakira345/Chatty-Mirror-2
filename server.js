@@ -347,14 +347,11 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ==========================================
-    // Replace your existing call signaling section with this:
-
+    // WEBRTC CALL SIGNALING - FIXED VERSION
+// Replace your existing call signaling section with this
 // ==========================================
-    // WEBRTC CALL SIGNALING
-    // ==========================================
-// NEW: Handle call initiation (notification to receiver)
 
+// Handle call initiation (notification to receiver)
 socket.on('initiate_call', (data) => {
     const { callerId, receiverId, callerName, callType } = data;
     
@@ -398,6 +395,7 @@ socket.on('call_rejected', (data) => {
     }
 });
 
+// Handle WebRTC offer
 socket.on('call:offer', (data) => {
     const { to, from, offer, isVideoCall } = data;
     
@@ -423,6 +421,7 @@ socket.on('call:offer', (data) => {
     }
 });
 
+// Handle WebRTC answer
 socket.on('call:answer', (data) => {
     const { to, from, answer } = data;
     
@@ -441,6 +440,7 @@ socket.on('call:answer', (data) => {
     }
 });
 
+// Handle ICE candidates
 socket.on('call:ice-candidate', (data) => {
     const { to, candidate } = data;
     
@@ -455,6 +455,7 @@ socket.on('call:ice-candidate', (data) => {
     }
 });
 
+// Handle call accepted notification
 socket.on('call:accepted', (data) => {
     const { to, from } = data;
     
@@ -470,6 +471,7 @@ socket.on('call:accepted', (data) => {
     }
 });
 
+// Handle call declined (from call window decline button)
 socket.on('call:declined', (data) => {
     const { to, from } = data;
     
@@ -479,12 +481,13 @@ socket.on('call:declined', (data) => {
     if (callerSocketId) {
         const callerSocket = io.sockets.sockets.get(callerSocketId);
         if (callerSocket) {
-            callerSocket.emit('call:declined');
+            callerSocket.emit('call:declined', { reason: 'Call declined by user' });
             console.log(`✅ Decline notification sent to ${to}`);
         }
     }
 });
 
+// Handle call ended
 socket.on('call:ended', (data) => {
     const { to, from } = data;
     
