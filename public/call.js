@@ -934,3 +934,4 @@ window.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 Initializing Call Manager...');
     new CallManager();
 });
+
