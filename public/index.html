@@ -346,7 +346,8 @@
         }
     </style>
 </head>
-<body>
+</head>
+<body class="preload">
     <!-- Header -->
     <header class="header">
         <div class="header-content">
@@ -1060,13 +1061,18 @@
     </div>
 
     <!-- YouTube IFrame API -->
-    <script src="https://www.youtube.com/iframe_api"></script>
-    
-    <!-- Socket.IO (must be loaded before app.js) -->
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="paint.js"></script>
-    <script src="app.js"></script>
+<script src="https://www.youtube.com/iframe_api"></script>
 
+<!-- Server Configuration (must be loaded FIRST) -->
+<script>
+    window.SERVER_URL = 'https://your-backend-app.onrender.com';
+    console.log('🔧 Server configured:', window.SERVER_URL);
+</script>
+
+<!-- Socket.IO (must be loaded before app.js) -->
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script src="paint.js"></script>
+<script src="app.js"></script>
     <script>
     document.getElementById('aiChatBtn').addEventListener('click', () => {
         document.getElementById('aiChatPopup').style.display = 'flex';
@@ -1078,4 +1084,3 @@
     </script>
 </body>
 </html>
-
