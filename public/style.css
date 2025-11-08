@@ -605,6 +605,296 @@ body {
     }
 }
 
+
+/* ==========================================
+   REPLY MESSAGE STYLES
+   ========================================== */
+
+/* Reply Bar (Input Area) */
+.reply-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: #f3f4f6;
+    border-left: 3px solid #2563eb;
+    border-radius: 8px 8px 0 0;
+    margin-bottom: 0.5rem;
+    animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.reply-bar-line {
+    width: 3px;
+    height: 100%;
+    background: #2563eb;
+    border-radius: 2px;
+}
+
+.reply-bar-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.reply-bar-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.reply-bar-header svg {
+    width: 16px;
+    height: 16px;
+    color: #2563eb;
+}
+
+.reply-bar-username {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #2563eb;
+}
+
+.reply-bar-text {
+    font-size: 0.875rem;
+    color: #6b7280;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.reply-bar-close {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    color: #6b7280;
+    transition: all 0.2s;
+}
+
+.reply-bar-close:hover {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.reply-bar-close svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Reply Preview in Messages */
+.reply-preview {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.message.own .reply-preview {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.reply-preview:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.message.own .reply-preview:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.reply-line {
+    width: 3px;
+    background: #2563eb;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.message.own .reply-line {
+    background: rgba(255, 255, 255, 0.6);
+}
+
+.reply-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.reply-username {
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: #2563eb;
+    margin-bottom: 0.125rem;
+}
+
+.message.own .reply-username {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.reply-text {
+    font-size: 0.8125rem;
+    color: #4b5563;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.message.own .reply-text {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Message Reply Button */
+.message {
+    position: relative;
+}
+
+.message-reply-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 50%;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.message-reply-btn svg {
+    width: 16px;
+    height: 16px;
+    color: #6b7280;
+}
+
+.message:hover .message-reply-btn {
+    display: flex;
+    opacity: 1;
+}
+
+.message.own .message-reply-btn {
+    left: 8px;  /* Changed from -40px */
+    right: auto;
+}
+
+.message-reply-btn:hover {
+    background: #f3f4f6;
+    border-color: #2563eb;
+    transform: scale(1.1);
+}
+
+.message-reply-btn:hover svg {
+    color: #2563eb;
+}
+
+.message-reply-btn:active {
+    transform: scale(0.95);
+}
+
+/* Message Highlight Animation (when scrolled to) */
+.message.highlight {
+    animation: messageHighlight 2s ease-in-out;
+}
+
+@keyframes messageHighlight {
+    0%, 100% {
+        background: transparent;
+    }
+    50% {
+        background: rgba(37, 99, 235, 0.1);
+    }
+}
+
+/* Mobile Adjustments */
+@media (max-width: 768px) {
+    .message-reply-btn {
+        right: 8px;
+        top: 8px;
+        display: flex;
+        opacity: 0.7;
+        width: 28px;
+        height: 28px;
+    }
+    
+    .message.own .message-reply-btn {
+        left: 8px;
+        right: auto;
+    }
+    
+    .reply-bar {
+        padding: 0.5rem;
+    }
+    
+    .reply-bar-username {
+        font-size: 0.8125rem;
+    }
+    
+    .reply-bar-text {
+        font-size: 0.8125rem;
+    }
+}
+
+/* Dark Mode Support (Optional) */
+@media (prefers-color-scheme: dark) {
+    .reply-bar {
+        background: #1f2937;
+        border-left-color: #3b82f6;
+    }
+    
+    .reply-bar-username {
+        color: #60a5fa;
+    }
+    
+    .reply-bar-text {
+        color: #9ca3af;
+    }
+    
+    .reply-bar-close {
+        color: #9ca3af;
+    }
+    
+    .reply-bar-close:hover {
+        background: #374151;
+        color: #d1d5db;
+    }
+    
+    .message-reply-btn {
+        background: #1f2937;
+        border-color: #374151;
+    }
+    
+    .message-reply-btn:hover {
+        background: #374151;
+        border-color: #3b82f6;
+    }
+}
+
+
+
 /* Input Area */
 .input-area {
     background: white;
@@ -1002,11 +1292,10 @@ body {
     font-size: 0.875rem;
 }
 
-/* Mobile Menu Toggle */
 .mobile-menu-toggle {
     display: none;
     position: fixed;
-    bottom: 80px;
+    bottom: 140px;  /* ← CHANGE THIS LINE */
     right: 20px;
     width: 56px;
     height: 56px;
@@ -3021,4 +3310,1110 @@ body {
     .ai-tab-container {
         border-radius: 0;
     }
+}
+
+/* ==========================================
+   DELETE MESSAGE BUTTON STYLES
+   ADD THIS TO YOUR style.css FILE
+   ========================================== */
+
+/* Delete Button - Only show on own messages */
+.message-delete-btn {
+    position: absolute;
+    top: 8px;
+    right: 48px; /* Position next to reply button */
+    width: 32px;
+    height: 32px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 50%;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.message-delete-btn svg {
+    width: 16px;
+    height: 16px;
+    color: #ef4444; /* Red color for delete */
+}
+
+.message.own:hover .message-delete-btn {
+    display: flex;
+    opacity: 1;
+}
+
+.message-delete-btn:hover {
+    background: #fee2e2; /* Light red background */
+    border-color: #ef4444;
+    transform: scale(1.1);
+}
+
+.message-delete-btn:hover svg {
+    color: #dc2626; /* Darker red on hover */
+}
+
+.message-delete-btn:active {
+    transform: scale(0.95);
+}
+
+/* Adjust reply button position when delete button is present */
+.message.own .message-reply-btn {
+    right: 88px; /* Move reply button further left */
+}
+
+/* Mobile Adjustments */
+@media (max-width: 768px) {
+    .message-delete-btn {
+        right: 48px;
+        top: 8px;
+        display: flex;
+        opacity: 0.7;
+        width: 28px;
+        height: 28px;
+    }
+    
+    .message.own .message-delete-btn {
+        right: 48px;
+    }
+    
+    .message.own .message-reply-btn {
+        right: 88px;
+    }
+}
+
+/* Extra small mobile */
+@media (max-width: 480px) {
+    .message-delete-btn {
+        width: 26px;
+        height: 26px;
+        right: 44px;
+    }
+    
+    .message-delete-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+    
+    .message.own .message-reply-btn {
+        right: 78px;
+    }
+}
+
+@media (max-width: 480px) {
+    .message-delete-btn {
+        width: 26px;
+        height: 26px;
+        right: 44px;
+    }
+    
+    .message-delete-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+    
+    .message.own .message-reply-btn {
+        right: 78px;
+    }
+}
+
+/* ==========================================
+   DELETE & REPLY BUTTONS - FIXED FOR DESKTOP & MOBILE
+   ========================================== */
+
+/* Position message-content as relative */
+.message .message-content {
+    position: relative;
+}
+
+/* Base button styles - ALWAYS DEFINED */
+.message-delete-btn,
+.message-reply-btn {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    transition: all 0.2s;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Delete button styling */
+.message-delete-btn {
+    top: 12px;
+    right: 12px;
+    background: #dc2626;
+    color: white;
+}
+
+/* Reply button styling */
+.message-reply-btn {
+    top: 12px;
+    left: 12px;
+    background: #2563eb;
+    color: white;
+}
+
+/* SVG sizing */
+.message-delete-btn svg,
+.message-reply-btn svg {
+    width: 20px;
+    height: 20px;
+    color: white;
+    stroke: white;
+}
+
+/* Desktop: Show on hover */
+@media (hover: hover) and (pointer: fine) {
+    .message .message-content:hover .message-delete-btn,
+    .message .message-content:hover .message-reply-btn {
+        opacity: 1;
+        pointer-events: all;
+    }
+    
+    .message-delete-btn:hover {
+        background: #b91c1c;
+        transform: scale(1.1);
+    }
+    
+    .message-reply-btn:hover {
+        background: #1d4ed8;
+        transform: scale(1.1);
+    }
+}
+
+/* Mobile/Touch: Hide by default, show on long-press */
+@media (hover: none) and (pointer: coarse) {
+    .message .message-content .message-delete-btn,
+    .message .message-content .message-reply-btn {
+        opacity: 0;
+        pointer-events: none;
+    }
+    
+    /* Show ONLY after long-press */
+    .message-content.show-mobile-buttons .message-delete-btn,
+    .message-content.show-mobile-buttons .message-reply-btn {
+        opacity: 1;
+        pointer-events: all;
+        animation: buttonFadeIn 0.2s ease-out;
+    }
+    
+    /* Visual feedback */
+    .message-content.show-mobile-buttons {
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+        border-radius: 12px;
+    }
+    
+    [data-theme="dark"] .message-content.show-mobile-buttons {
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+    }
+}
+
+/* Animation */
+@keyframes buttonFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Dark mode button colors */
+[data-theme="dark"] .message-delete-btn {
+    background: #ef4444;
+}
+
+[data-theme="dark"] .message-reply-btn {
+    background: #3b82f6;
+}
+/* ==========================================
+   DARK MODE IMPLEMENTATION
+   Add this to your existing style.css
+   ========================================== */
+
+/* Dark Mode Variables */
+:root {
+    --bg-primary: #f0f2f5;
+    --bg-secondary: white;
+    --bg-tertiary: #f9fafb;
+    --text-primary: #111827;
+    --text-secondary: #6b7280;
+    --border-color: #e5e7eb;
+    --accent-color: #2563eb;
+    --header-bg: #2563eb;
+    --message-own-bg: #2563eb;
+    --message-other-bg: white;
+    --input-bg: white;
+    --hover-bg: #f3f4f6;
+}
+
+[data-theme="dark"] {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --border-color: #334155;
+    --accent-color: #3b82f6;
+    --header-bg: #1e293b;
+    --message-own-bg: #3b82f6;
+    --message-other-bg: #334155;
+    --input-bg: #1e293b;
+    --hover-bg: #334155;
+}
+
+/* Dark Mode Toggle Button */
+.theme-toggle {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.theme-toggle:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: rotate(180deg);
+}
+
+.theme-toggle svg {
+    width: 20px;
+    height: 20px;
+    color: white;
+    transition: all 0.3s ease;
+}
+
+[data-theme="dark"] .theme-toggle svg.sun-icon {
+    display: block;
+}
+
+[data-theme="dark"] .theme-toggle svg.moon-icon {
+    display: none;
+}
+
+[data-theme="light"] .theme-toggle svg.sun-icon {
+    display: none;
+}
+
+[data-theme="light"] .theme-toggle svg.moon-icon {
+    display: block;
+}
+
+/* Apply Dark Mode to Body */
+[data-theme="dark"] body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+/* Header Dark Mode */
+[data-theme="dark"] .header {
+    background: var(--header-bg);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .user-id-badge {
+    background: rgba(59, 130, 246, 0.2);
+}
+
+[data-theme="dark"] .settings-btn {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .settings-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* Sidebar Dark Mode */
+[data-theme="dark"] .sidebar {
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .tabs {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .tab-btn {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .tab-btn:hover {
+    background: var(--hover-bg);
+}
+
+[data-theme="dark"] .tab-btn.active {
+    color: var(--accent-color);
+}
+
+/* Friends List Dark Mode */
+[data-theme="dark"] .friend-item {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .friend-item:hover {
+    background: var(--hover-bg);
+}
+
+[data-theme="dark"] .friend-item.active {
+    background: rgba(59, 130, 246, 0.15);
+}
+
+[data-theme="dark"] .friend-name {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .friend-id {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .empty-state {
+    color: var(--text-secondary);
+}
+
+/* Search Dark Mode */
+[data-theme="dark"] .search-container {
+    background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .search-label {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .search-input {
+    background: var(--input-bg);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .search-input:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+[data-theme="dark"] .search-result {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+}
+
+/* Chat Area Dark Mode */
+[data-theme="dark"] .chat-area {
+    background: var(--bg-primary);
+}
+
+[data-theme="dark"] .no-chat-selected {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .chat-header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] #chatFriendName {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] #chatFriendId {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] #typingIndicator {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .messages-area {
+    background: var(--bg-primary);
+}
+
+/* Messages Dark Mode */
+[data-theme="dark"] .message.own .message-content {
+    background: var(--message-own-bg);
+    color: white;
+}
+
+[data-theme="dark"] .message:not(.own) .message-content {
+    background: var(--message-other-bg);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .file-message {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .message-time {
+    color: var(--text-secondary);
+}
+
+/* Reply Preview Dark Mode */
+[data-theme="dark"] .reply-preview {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .message.own .reply-preview {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .reply-username {
+    color: var(--accent-color);
+}
+
+[data-theme="dark"] .message.own .reply-username {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+[data-theme="dark"] .reply-text {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .message.own .reply-text {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* Reply Bar Dark Mode */
+[data-theme="dark"] .reply-bar {
+    background: var(--bg-tertiary);
+    border-left-color: var(--accent-color);
+}
+
+[data-theme="dark"] .reply-bar-username {
+    color: var(--accent-color);
+}
+
+[data-theme="dark"] .reply-bar-text {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .reply-bar-close {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .reply-bar-close:hover {
+    background: var(--hover-bg);
+    color: var(--text-primary);
+}
+
+/* Message Action Buttons Dark Mode */
+[data-theme="dark"] .message-reply-btn,
+[data-theme="dark"] .message-delete-btn {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .message-reply-btn:hover {
+    background: var(--hover-bg);
+    border-color: var(--accent-color);
+}
+
+[data-theme="dark"] .message-delete-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: #ef4444;
+}
+
+/* Input Area Dark Mode */
+[data-theme="dark"] .input-area {
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .emoji-picker {
+    background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .emoji-btn:hover {
+    background: var(--hover-bg);
+}
+
+[data-theme="dark"] .message-input {
+    background: var(--input-bg);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .message-input:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+[data-theme="dark"] .icon-btn {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .icon-btn:hover {
+    background: var(--hover-bg);
+}
+
+/* Modal Dark Mode */
+[data-theme="dark"] .modal-overlay {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="dark"] .modal-content {
+    background: var(--bg-secondary);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .modal-header {
+    border-bottom: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .modal-header h2 {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .close-btn,
+[data-theme="dark"] .back-btn {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .close-btn:hover,
+[data-theme="dark"] .back-btn:hover {
+    background: var(--hover-bg);
+    color: var(--text-primary);
+}
+
+/* Settings Modal Dark Mode */
+[data-theme="dark"] .settings-menu-item {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .settings-menu-item:hover {
+    background: var(--hover-bg);
+}
+
+/* Profile Edit Dark Mode */
+[data-theme="dark"] .profile-field {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .profile-label {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .profile-input {
+    background: var(--input-bg);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .profile-input:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+[data-theme="dark"] .profile-photo-hint,
+[data-theme="dark"] .profile-field-hint {
+    color: var(--text-secondary);
+}
+
+/* Karaoke Modal Dark Mode */
+[data-theme="dark"] .karaoke-player-section {
+    background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .youtube-search-input {
+    background: var(--input-bg);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .youtube-video-item {
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .youtube-video-item:hover {
+    background: var(--hover-bg);
+}
+
+[data-theme="dark"] .youtube-video-item.selected {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: var(--accent-color);
+}
+
+[data-theme="dark"] .youtube-video-title {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .youtube-video-channel {
+    color: var(--text-secondary);
+}
+
+/* Scrollbar Dark Mode */
+[data-theme="dark"] ::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: #475569;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+}
+
+/* Loading Overlay Dark Mode */
+[data-theme="dark"] .loading-overlay {
+    background: rgba(15, 23, 42, 0.95);
+}
+
+[data-theme="dark"] .spinner {
+    border-color: #334155;
+    border-top-color: var(--accent-color);
+}
+
+/* Image Modal Dark Mode */
+[data-theme="dark"] .image-modal {
+    background-color: rgba(0, 0, 0, 0.95);
+}
+
+/* Logout Modal Dark Mode */
+[data-theme="dark"] .logout-modal-content {
+    background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .logout-modal-header h3 {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .logout-modal-body p {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .logout-cancel-btn {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .logout-cancel-btn:hover {
+    background: var(--hover-bg);
+}
+
+/* AI Tab Dark Mode */
+[data-theme="dark"] .ai-tab-container {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+}
+
+/* Mobile Menu Toggle Dark Mode */
+[data-theme="dark"] .mobile-menu-toggle {
+    background: var(--accent-color);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+/* Smooth Transition for Theme Switch */
+* {
+    transition: background-color 0.3s ease, 
+                color 0.3s ease, 
+                border-color 0.3s ease,
+                box-shadow 0.3s ease;
+}
+
+/* Prevent transition on page load */
+.preload * {
+    transition: none !important;
+}
+
+/* Dark Mode Status Indicators */
+[data-theme="dark"] .online-indicator.online {
+    background: #10b981;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+[data-theme="dark"] .online-indicator {
+    background: #475569;
+}
+
+/* Message Status Ticks Dark Mode */
+[data-theme="dark"] .message-status.sent svg {
+    stroke: #64748b;
+}
+
+[data-theme="dark"] .message-status.seen svg {
+    stroke: #10b981;
+}
+
+/* Countdown Dark Mode */
+[data-theme="dark"] .countdown-overlay {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+/* Special Effects for Dark Mode */
+[data-theme="dark"] .avatar {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="dark"] .message.own .message-content {
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+[data-theme="dark"] .message:not(.own) .message-content {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Mobile Dark Mode Adjustments */
+@media (max-width: 768px) {
+    [data-theme="dark"] .mobile-backdrop.active {
+        background: rgba(0, 0, 0, 0.7);
+    }
+}
+
+/* Ensure buttons are visible in dark mode */
+[data-theme="dark"] .send-btn,
+[data-theme="dark"] .search-btn,
+[data-theme="dark"] .add-friend-btn,
+[data-theme="dark"] .save-profile-btn,
+[data-theme="dark"] .record-btn,
+[data-theme="dark"] .youtube-search-btn {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Highlight effect in dark mode */
+[data-theme="dark"] .message.highlight {
+    animation: messageHighlightDark 2s ease-in-out;
+}
+
+@keyframes messageHighlightDark {
+    0%, 100% {
+        background: transparent;
+    }
+    50% {
+        background: rgba(59, 130, 246, 0.15);
+    }
+}
+
+/* Button fade-in animation */
+@keyframes buttonFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Desktop: Show on hover */
+@media (hover: hover) and (pointer: fine) {
+    .message .message-content:hover .message-delete-btn,
+    .message .message-content:hover .message-reply-btn {
+        display: flex !important;
+        opacity: 1 !important;
+    }
+}
+
+/* ==========================================
+   FINAL FIX: CHAT HEADER & INPUT AREA
+   ========================================== */
+
+/* Chat Header - Clean Fixed Layout */
+.chat-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 1rem;
+    flex-shrink: 0;
+    gap: 1rem;
+    flex-wrap: nowrap !important;
+}
+
+.chat-header-content {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.75rem;
+    flex: 1;
+    min-width: 0;
+    order: 1;
+}
+
+/* Call buttons container - RIGHT SIDE */
+.chat-header > div:last-child {
+    display: flex !important;
+    gap: 0.5rem;
+    align-items: center;
+    flex-shrink: 0 !important;
+    order: 2;
+    margin-left: auto !important;
+}
+
+
+/* ADD THIS NEW CLASS HERE ⬇️ */
+.chat-header-actions {
+    display: flex !important;
+    gap: 0.5rem;
+    align-items: center;
+    flex-shrink: 0 !important;
+    margin-left: auto !important;
+}
+
+.chat-header-info {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Input Area - Always Visible */
+.input-area {
+    position: sticky !important;
+    bottom: 20px !important;  /* ⬅️ CHANGED FROM 0 TO 20px */
+    left: 0;
+    right: 0;
+    background: white !important;
+    border-top: 1px solid #e5e7eb;
+    padding: 1rem !important;
+    flex-shrink: 0 !important;
+    z-index: 100 !important;
+    width: 100% !important;
+}
+
+.input-controls {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem;
+    width: 100% !important;
+}
+
+.message-input {
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+
+.send-btn {
+    flex-shrink: 0 !important;
+    min-width: fit-content !important;
+}
+
+/* Dark Mode */
+[data-theme="dark"] .chat-header {
+    background: var(--bg-secondary) !important;
+    border-bottom-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .input-area {
+    background: var(--bg-secondary) !important;
+    border-top-color: var(--border-color) !important;
+}
+
+/* ===== MOBILE RESPONSIVE ===== */
+
+/* Tablet */
+@media (max-width: 991px) {
+    .chat-header {
+        padding: 0.875rem !important;
+    }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+    .chat-header {
+        padding: 0.75rem !important;
+    }
+    
+    .chat-header-content {
+        gap: 0.5rem;
+    }
+    
+    .chat-header > div:last-child {
+        gap: 0.4rem;
+    }
+    
+    #voiceCallBtn,
+    #videoCallBtn {
+        width: 36px !important;
+        height: 36px !important;
+        padding: 0.4rem !important;
+    }
+    
+    #voiceCallBtn svg,
+    #videoCallBtn svg {
+        width: 18px !important;
+        height: 18px !important;
+    }
+    
+    .input-area {
+        padding: 0.75rem !important;
+        bottom: 15px !important;
+    }
+    
+    .input-controls {
+        gap: 0.4rem;
+    }
+    
+    .message-input {
+        font-size: 16px !important;
+        padding: 0.65rem 0.9rem !important;
+        min-height: 42px !important;
+    }
+    
+    .send-btn {
+        padding: 0.65rem 0.9rem !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
+    }
+    
+    .icon-btn {
+        min-width: 36px !important;
+        min-height: 36px !important;
+    }
+}
+
+/* Small Mobile */
+@media (max-width: 480px) {
+    .chat-header {
+        padding: 0.65rem !important;
+    }
+    
+    .avatar {
+        width: 40px !important;
+        height: 40px !important;
+    }
+    
+    #chatFriendName {
+        font-size: 0.9rem;
+    }
+    
+    #voiceCallBtn,
+    #videoCallBtn {
+        width: 34px !important;
+        height: 34px !important;
+        padding: 0.35rem !important;
+    }
+    
+    #voiceCallBtn svg,
+    #videoCallBtn svg {
+        width: 16px !important;
+        height: 16px !important;
+    }
+    
+    .input-area {
+        padding: 0.65rem !important;
+    }
+    
+    .message-input {
+        padding: 0.6rem 0.8rem !important;
+        min-height: 40px !important;
+        font-size: 15px !important;
+    }
+    
+    .send-btn {
+        padding: 0.6rem 0.8rem !important;
+    }
+}
+
+/* Extra Small Mobile */
+@media (max-width: 360px) {
+    .chat-header {
+        padding: 0.6rem !important;
+    }
+    
+    .avatar {
+        width: 36px !important;
+        height: 36px !important;
+        font-size: 0.875rem !important;
+    }
+    
+    #chatFriendName {
+        font-size: 0.875rem;
+    }
+    
+    #voiceCallBtn,
+    #videoCallBtn {
+        width: 32px !important;
+        height: 32px !important;
+        padding: 0.3rem !important;
+    }
+    
+    #voiceCallBtn svg,
+    #videoCallBtn svg {
+        width: 14px !important;
+        height: 14px !important;
+    }
+    
+    .input-area {
+        padding: 0.6rem !important;
+    }
+    
+    .message-input {
+        padding: 0.55rem 0.7rem !important;
+        font-size: 14px !important;
+    }
+}
+
+/* iOS Safe Area */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .input-area {
+        padding-bottom: calc(1rem + env(safe-area-inset-bottom)) !important;
+    }
+    
+    @media (max-width: 768px) {
+        .input-area {
+            padding-bottom: calc(0.75rem + env(safe-area-inset-bottom)) !important;
+        }
+    }
+}
+
+/* ==========================================
+   FIX: FLOATING BUTTON COVERING SEND BUTTON
+   ========================================== */
+
+/* Move floating action button up */
+.input-area .icon-btn:last-of-type {
+    position: relative !important;
+    bottom: 50px !important;
+    right: 10px !important;
+}
+
+/* Fix for contact/group button */
+.add-contact-btn,
+.group-btn {
+    position: fixed !important;
+    bottom: 100px !important;
+    right: 20px !important;
+    z-index: 20 !important;
+}
+
+/* Ensure send button stays on top */
+.send-btn {
+    position: relative !important;
+    z-index: 101 !important;
+    order: 999 !important;
+    margin-left: auto !important;
+}
+
+/* Move any floating buttons up */
+button[style*="position: fixed"][style*="bottom"] {
+    bottom: 100px !important;
+}
+
+/* FORCE MOVE FLOATING BUTTON UP */
+*[style*="position: fixed"] {
+    bottom: 150px !important;
+}
+
+.mobile-menu-toggle,
+[class*="float"],
+[class*="fab"],
+button[style*="bottom"] {
+    bottom: 150px !important;
 }
