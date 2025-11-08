@@ -23,12 +23,13 @@ const server = http.createServer(app);
 const io = socketIO(server, {
     cors: {
         origin: [
-            "http://localhost:3001",
-            "https://your-frontend-app.onrender.com",  // Replace with YOUR frontend URL
-            process.env.CLIENT_URL
+            "http://localhost:3001",                          // Local development
+            "https://chatty-mirror-2.onrender.com",           // ✅ Your deployed frontend
+            process.env.CLIENT_URL                            // Environment variable
         ].filter(Boolean),
         methods: ["GET", "POST"],
-        credentials: true
+        credentials: true,
+        allowedHeaders: ["Content-Type", "Authorization"]    // Added for better CORS support
     },
     transports: ['websocket', 'polling'],
     allowEIO3: true,
@@ -40,13 +41,16 @@ const io = socketIO(server, {
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
 
+// Line 32-39: Express CORS
 app.use(cors({
     origin: [
-        "http://localhost:3001",
-        "https://your-frontend-app.onrender.com",  // Replace with YOUR frontend URL
-        process.env.CLIENT_URL
+        "http://localhost:3001",                          // Local development
+        "https://chatty-mirror-2.onrender.com",           // ✅ Your deployed frontend
+        process.env.CLIENT_URL                            // Environment variable
     ].filter(Boolean),
-    credentials: true
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Added more methods
+    allowedHeaders: ["Content-Type", "Authorization"]     // Added for better CORS support
 }));
 
 // Rate limiting
