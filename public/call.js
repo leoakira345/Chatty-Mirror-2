@@ -1,4 +1,4 @@
-// FULLY DEBUGGED WebRTC Call Manager - CONNECTING FIX
+// FULLY DEBUGGED WebRTC Call Manager - ALL CLIENT-SIDE FIXES APPLIED
 class CallManager {
     constructor() {
         this.socket = null;
@@ -18,6 +18,15 @@ class CallManager {
         this.isOfferCreated = false;
         this.isAnswerCreated = false;
         this.hasRemoteDescription = false;
+        
+        // FIX 1: Add guard flags
+        this.callStarted = false;
+        
+        // FIX 2: Add retry counters
+        this.offerRetryCount = 0;
+        
+        // FIX 4: Add ICE restart flag
+        this.iceRestartAttempted = false;
         
         // Audio elements
         this.outgoingRingtone = null;
@@ -58,43 +67,65 @@ class CallManager {
     }
 
     connectSocket() {
-    // Use the global SERVER_URL or fallback to localhost
-    const serverUrl = window.SERVER_URL || 'http://localhost:3000';
+    // Check if Socket.IO is loaded
+    if (typeof io === 'undefined') {
+        console.error('❌ Socket.IO library not loaded!');
+        alert('Socket.IO library failed to load. Please check your internet connection.');
+        return;
+    }
     
-    console.log('🔌 Connecting to server:', serverUrl);
+    const serverUrl = 'http://localhost:3000';
+    
+    console.log('🔌 Attempting connection to:', serverUrl);
+    console.log('🔌 Current page:', window.location.href);
+    console.log('🔌 Socket.IO version:', io.version);
     
     this.socket = io(serverUrl, {
         transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        timeout: 20000,
+        forceNew: true,
+        autoConnect: true
     });
 
-        this.socket.on('connect', () => {
-            console.log('✅ Socket connected:', this.socket.id);
-            this.socket.emit('user_connected', this.userId);
-            
-            // Start call flow after connection
-            setTimeout(() => this.checkCallType(), 500);
+    this.socket.on('connect', () => {
+        console.log('✅ Socket connected:', this.socket.id);
+        
+        this.socket.once('user_registered', () => {
+            console.log('✅ User registration confirmed, starting call...');
+            this.checkCallType();
         });
+        
+        this.socket.emit('user_connected', this.userId);
+        
+        setTimeout(() => {
+            console.log('⏰ Starting call (fallback timeout)');
+            this.checkCallType();
+        }, 2000);
+    });
 
-        this.socket.on('connect_error', (error) => {
-            console.error('❌ Socket connection error:', error);
-            alert('Failed to connect to server. Please check if server is running.');
-        });
+    this.socket.on('connect_error', (error) => {
+        console.error('❌ Socket connection error:', error);
+        console.error('❌ Error type:', error.type);
+        console.error('❌ Error message:', error.message);
+        console.error('❌ Error description:', error.description);
+        alert('Failed to connect to server. Error: ' + error.message + '\n\nPlease check:\n1. Server is running on port 3000\n2. No firewall blocking\n3. CORS is configured');
+    });
 
-        // WebRTC signaling events
-        this.socket.on('call:offer', (data) => this.handleOffer(data));
-        this.socket.on('call:answer', (data) => this.handleAnswer(data));
-        this.socket.on('call:ice-candidate', (data) => this.handleIceCandidate(data));
-        this.socket.on('call:accepted', (data) => this.handleCallAccepted(data));
-        this.socket.on('call:ended', (data) => this.handleCallEnded(data));
-        this.socket.on('call:declined', (data) => this.handleCallDeclined(data));
-
-        this.socket.on('disconnect', () => {
-            console.log('⚠️ Socket disconnected');
-        });
-    }
+    this.socket.on('disconnect', (reason) => {
+        console.log('⚠️ Socket disconnected. Reason:', reason);
+    });
+    
+    // Add timeout check
+    setTimeout(() => {
+        if (!this.socket || !this.socket.connected) {
+            console.error('❌ Connection timeout after 5 seconds');
+            alert('Connection timeout. Server might not be running on http://localhost:3000');
+        }
+    }, 5000);
+}
 
     initializeAudio() {
         this.outgoingRingtone = new Audio();
@@ -320,9 +351,28 @@ class CallManager {
         document.getElementById('callerInitial').textContent = this.friendName.charAt(0).toUpperCase();
         document.getElementById('remoteUserName').textContent = this.friendName;
         document.getElementById('remoteUserInitial').textContent = this.friendName.charAt(0).toUpperCase();
+        
+        // FIX 5: Hide video controls for audio calls
+        if (!this.isVideoCall) {
+            const videoBtn = document.getElementById('toggleVideoBtn');
+            const switchBtn = document.getElementById('switchCameraBtn');
+            if (videoBtn) videoBtn.style.display = 'none';
+            if (switchBtn) switchBtn.style.display = 'none';
+            
+            document.getElementById('localVideo').style.display = 'none';
+            document.getElementById('remoteVideo').style.display = 'none';
+            document.getElementById('remoteVideoPlaceholder').style.display = 'flex';
+        }
     }
 
+    // FIX 1: Add guard to prevent duplicate calls
     async checkCallType() {
+        if (this.callStarted) {
+            console.log('⚠️ Call already started, ignoring duplicate call');
+            return;
+        }
+        this.callStarted = true;
+        
         const type = new URLSearchParams(window.location.search).get('callType');
         
         console.log('🔍 Call type:', type);
@@ -345,25 +395,21 @@ class CallManager {
             console.log('🔵 STARTING OUTGOING CALL');
             console.log('='.repeat(50));
             
-            // Show active call screen
             this.showActiveCallScreen();
             document.getElementById('callStatus').textContent = 'Getting media...';
             
-            // Step 1: Get user media
             console.log('1️⃣ Getting user media...');
             await this.getUserMedia();
             console.log('✅ Got media');
             
             document.getElementById('callStatus').textContent = 'Setting up connection...';
             
-            // Step 2: Create peer connection
             console.log('2️⃣ Creating peer connection...');
             this.createPeerConnection();
             console.log('✅ Peer connection created');
             
             document.getElementById('callStatus').textContent = 'Creating offer...';
             
-            // Step 3: Create offer
             console.log('3️⃣ Creating offer...');
             const offer = await this.peerConnection.createOffer({
                 offerToReceiveAudio: true,
@@ -371,7 +417,6 @@ class CallManager {
             });
             console.log('✅ Offer created');
             
-            // Step 4: Set local description
             console.log('4️⃣ Setting local description...');
             await this.peerConnection.setLocalDescription(offer);
             this.isOfferCreated = true;
@@ -379,7 +424,6 @@ class CallManager {
             
             document.getElementById('callStatus').textContent = 'Calling...';
             
-            // Step 5: Send offer
             console.log('5️⃣ Sending offer to:', this.friendId);
             this.socket.emit('call:offer', {
                 to: this.friendId,
@@ -406,26 +450,22 @@ class CallManager {
             
             this.stopRingtones();
             
-            // Hide incoming screen, show active screen
             document.getElementById('incomingCallScreen').style.display = 'none';
             this.showActiveCallScreen();
             document.getElementById('callStatus').textContent = 'Getting media...';
 
-            // Step 1: Get user media
             console.log('1️⃣ Getting user media...');
             await this.getUserMedia();
             console.log('✅ Got media');
             
             document.getElementById('callStatus').textContent = 'Setting up connection...';
             
-            // Step 2: Create peer connection
             console.log('2️⃣ Creating peer connection...');
             this.createPeerConnection();
             console.log('✅ Peer connection created');
             
             document.getElementById('callStatus').textContent = 'Waiting for caller...';
             
-            // Step 3: Notify caller that call was accepted
             console.log('3️⃣ Sending call accepted notification');
             this.socket.emit('call:accepted', {
                 to: this.friendId,
@@ -501,37 +541,45 @@ class CallManager {
         
         this.peerConnection = new RTCPeerConnection(this.iceServers);
 
-        // Add local stream tracks
         if (this.localStream) {
             this.localStream.getTracks().forEach(track => {
-                const sender = this.peerConnection.addTrack(track, this.localStream);
+                this.peerConnection.addTrack(track, this.localStream);
                 console.log('➕ Added local track:', track.kind, track.id);
             });
         }
 
-        // Handle remote stream
+        // FIX 3: Improved remote video handling
         this.peerConnection.ontrack = (event) => {
             console.log('📺 ontrack event - kind:', event.track.kind, 'id:', event.track.id);
             console.log('📺 Streams:', event.streams.length);
+            console.log('📺 Track state:', event.track.readyState);
+            console.log('📺 Track enabled:', event.track.enabled);
             
             if (!this.remoteStream) {
                 this.remoteStream = new MediaStream();
                 const remoteVideo = document.getElementById('remoteVideo');
                 remoteVideo.srcObject = this.remoteStream;
                 remoteVideo.muted = false;
+                remoteVideo.autoplay = true;
+                remoteVideo.playsInline = true;
                 console.log('✅ Remote video element configured');
             }
             
             this.remoteStream.addTrack(event.track);
             console.log('✅ Added remote track:', event.track.kind);
+            console.log('📊 Remote stream tracks:', this.remoteStream.getTracks().length);
             
             if (event.track.kind === 'video') {
                 document.getElementById('remoteVideoPlaceholder').style.display = 'none';
                 console.log('✅ Remote video placeholder hidden');
+                
+                const remoteVideo = document.getElementById('remoteVideo');
+                remoteVideo.play().catch(e => {
+                    console.error('❌ Remote video play error:', e);
+                });
             }
         };
 
-        // Handle ICE candidates
         this.peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
                 console.log('🧊 New ICE candidate:', event.candidate.type);
@@ -545,12 +593,10 @@ class CallManager {
             }
         };
 
-        // ICE gathering state
         this.peerConnection.onicegatheringstatechange = () => {
             console.log('🧊 ICE gathering state:', this.peerConnection.iceGatheringState);
         };
 
-        // Handle connection state changes
         this.peerConnection.onconnectionstatechange = () => {
             const state = this.peerConnection.connectionState;
             console.log('🔄 Connection state changed to:', state);
@@ -568,27 +614,42 @@ class CallManager {
             }
         };
 
-        // Handle ICE connection state
+        // FIX 4: Better ICE connection error handling
         this.peerConnection.oniceconnectionstatechange = () => {
             const state = this.peerConnection.iceConnectionState;
             console.log('❄️ ICE connection state:', state);
             
             if (state === 'checking') {
                 console.log('🔍 ICE candidates are being checked...');
+                document.getElementById('callStatus').textContent = 'Establishing connection...';
             } else if (state === 'connected' || state === 'completed') {
                 console.log('✅ ICE connection established');
             } else if (state === 'failed') {
                 console.log('❌ ICE connection failed');
                 console.log('💡 This might be a firewall/NAT issue. May need TURN server.');
-                // Try to restart ICE
-                console.log('🔄 Attempting ICE restart...');
-                this.peerConnection.restartIce();
+                
+                if (!this.iceRestartAttempted) {
+                    console.log('🔄 Attempting ICE restart...');
+                    this.iceRestartAttempted = true;
+                    this.peerConnection.restartIce();
+                    
+                    setTimeout(() => {
+                        if (this.peerConnection && this.peerConnection.iceConnectionState === 'failed') {
+                            alert('Connection failed. This might be due to network restrictions.');
+                            this.endCall();
+                        }
+                    }, 5000);
+                } else {
+                    alert('Unable to establish connection. Please check your network.');
+                    this.endCall();
+                }
             } else if (state === 'disconnected') {
                 console.log('⚠️ ICE disconnected');
+                document.getElementById('callStatus').textContent = 'Connection interrupted...';
+                document.getElementById('callStatus').style.display = 'block';
             }
         };
 
-        // Signaling state
         this.peerConnection.onsignalingstatechange = () => {
             console.log('📡 Signaling state:', this.peerConnection.signalingState);
         };
@@ -596,6 +657,7 @@ class CallManager {
         console.log('✅ Peer connection fully configured with all event handlers');
     }
 
+    // FIX 2: Add retry limit for handleOffer
     async handleOffer(data) {
         try {
             console.log('\n' + '='.repeat(50));
@@ -606,19 +668,29 @@ class CallManager {
             
             if (!this.peerConnection) {
                 console.log('⚠️ Peer connection not ready, retrying in 200ms...');
+                
+                if (!this.offerRetryCount) this.offerRetryCount = 0;
+                this.offerRetryCount++;
+                
+                if (this.offerRetryCount > 10) {
+                    console.error('❌ Peer connection never initialized after 10 retries');
+                    this.endCall();
+                    return;
+                }
+                
                 setTimeout(() => this.handleOffer(data), 200);
                 return;
             }
+            
+            this.offerRetryCount = 0;
 
             document.getElementById('callStatus').textContent = 'Processing offer...';
 
-            // Set remote description (the offer)
             console.log('1️⃣ Setting remote description (offer)...');
             await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
             this.hasRemoteDescription = true;
             console.log('✅ Remote description set');
 
-            // Process pending ICE candidates
             if (this.pendingIceCandidates.length > 0) {
                 console.log(`2️⃣ Processing ${this.pendingIceCandidates.length} pending ICE candidates...`);
                 for (const candidate of this.pendingIceCandidates) {
@@ -630,12 +702,10 @@ class CallManager {
 
             document.getElementById('callStatus').textContent = 'Creating answer...';
 
-            // Create answer
             console.log('3️⃣ Creating answer...');
             const answer = await this.peerConnection.createAnswer();
             console.log('✅ Answer created');
 
-            // Set local description
             console.log('4️⃣ Setting local description (answer)...');
             await this.peerConnection.setLocalDescription(answer);
             this.isAnswerCreated = true;
@@ -643,7 +713,6 @@ class CallManager {
 
             document.getElementById('callStatus').textContent = 'Connecting...';
 
-            // Send answer
             console.log('5️⃣ Sending answer to:', data.from);
             this.socket.emit('call:answer', {
                 to: data.from,
@@ -676,13 +745,11 @@ class CallManager {
 
             document.getElementById('callStatus').textContent = 'Processing answer...';
 
-            // Set remote description (the answer)
             console.log('1️⃣ Setting remote description (answer)...');
             await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
             this.hasRemoteDescription = true;
             console.log('✅ Remote description set');
 
-            // Process pending ICE candidates
             if (this.pendingIceCandidates.length > 0) {
                 console.log(`2️⃣ Processing ${this.pendingIceCandidates.length} pending ICE candidates...`);
                 for (const candidate of this.pendingIceCandidates) {
@@ -712,20 +779,17 @@ class CallManager {
             console.log('   Type:', data.candidate.type || 'unknown');
             console.log('   Protocol:', data.candidate.protocol || 'unknown');
 
-            // Queue if remote description not set
             if (!this.peerConnection || !this.hasRemoteDescription) {
                 console.log('📦 Queueing ICE candidate (no remote description yet)');
                 this.pendingIceCandidates.push(data.candidate);
                 return;
             }
 
-            // Add candidate
             await this.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
             console.log('✅ ICE candidate added successfully');
             
         } catch (error) {
             console.error('❌ Error handling ICE candidate:', error);
-            // Don't fail the call for individual candidate errors
         }
     }
 
@@ -742,13 +806,11 @@ class CallManager {
         
         this.stopRingtones();
         
-        // Update UI
         document.getElementById('callStatus').style.display = 'none';
         document.getElementById('callTimer').style.display = 'block';
         this.callStartTime = Date.now();
         this.startTimer();
         
-        // Log stream info
         console.log('📊 Connection Stats:');
         console.log('  Local tracks:', this.localStream?.getTracks().map(t => t.kind));
         console.log('  Remote tracks:', this.remoteStream?.getTracks().map(t => t.kind));
@@ -895,6 +957,7 @@ class CallManager {
         }, 500);
     }
 
+    // FIX 7: Enhanced cleanup with proper memory leak prevention
     cleanupCall() {
         console.log('🧹 Cleaning up call resources...');
         
@@ -902,6 +965,7 @@ class CallManager {
 
         if (this.timerInterval) {
             clearInterval(this.timerInterval);
+            this.timerInterval = null;
         }
 
         if (this.localStream) {
@@ -909,12 +973,37 @@ class CallManager {
                 track.stop();
                 console.log('⏹️ Stopped track:', track.kind);
             });
+            this.localStream = null;
+        }
+        
+        if (this.remoteStream) {
+            this.remoteStream.getTracks().forEach(track => {
+                track.stop();
+            });
+            this.remoteStream = null;
         }
 
         if (this.peerConnection) {
+            // Remove all event listeners before closing
+            this.peerConnection.ontrack = null;
+            this.peerConnection.onicecandidate = null;
+            this.peerConnection.onconnectionstatechange = null;
+            this.peerConnection.oniceconnectionstatechange = null;
+            this.peerConnection.onsignalingstatechange = null;
+            this.peerConnection.onicegatheringstatechange = null;
+            
             this.peerConnection.close();
+            this.peerConnection = null;
             console.log('🔒 Peer connection closed');
         }
+        
+        // Reset flags
+        this.hasRemoteDescription = false;
+        this.isOfferCreated = false;
+        this.isAnswerCreated = false;
+        this.callStarted = false;
+        this.iceRestartAttempted = false;
+        this.offerRetryCount = 0;
         
         console.log('✅ Cleanup complete');
     }
