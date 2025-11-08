@@ -126,7 +126,10 @@ async function verifyPassword(password, hash) {
 
 function sanitizeInput(input) {
     if (typeof input !== 'string') return input;
-    return validator.escape(input.trim());
+    
+    // Just trim whitespace, don't escape anything
+    // The frontend uses textContent which is already safe from XSS
+    return input.trim();
 }
 
 // ==========================================
@@ -152,47 +155,54 @@ io.on('connection', (socket) => {
     };
 
     socket.on('user_connected', async (userId) => {
-        if (!/^\d{4}$/.test(userId)) {
-            socket.emit('error', { message: 'Invalid user ID format' });
-            return;
-        }
+    if (!/^\d{4}$/.test(userId)) {
+        socket.emit('error', { message: 'Invalid user ID format' });
+        return;
+    }
 
-        if (activeUsers.has(userId)) {
-            const oldSocketId = activeUsers.get(userId);
-            console.log(`🔄 User ${userId} reconnecting, removing old socket ${oldSocketId}`);
-        }
+    if (activeUsers.has(userId)) {
+        const oldSocketId = activeUsers.get(userId);
+        console.log(`🔄 User ${userId} reconnecting, updating socket ${oldSocketId} -> ${socket.id}`);
         
-        activeUsers.set(userId, socket.id);
-        socket.userId = userId;
-        console.log(`👤 User ${userId} connected with socket ${socket.id}`);
-        console.log(`📊 Total active users: ${activeUsers.size}`);
+        // DON'T disconnect old socket - multiple windows can be open (chat + call)
+        // Just update the active socket ID for messaging
+    }
+    
+    // Update to new socket
+    activeUsers.set(userId, socket.id);
+    socket.userId = userId;
+    console.log(`👤 User ${userId} connected with socket ${socket.id}`);
+    console.log(`📊 Total active users: ${activeUsers.size}`);
+
+    // Send confirmation back to client
+    socket.emit('user_registered', { userId: userId, socketId: socket.id }); 
+    
+    // Notify everyone that this user is online
+    io.emit('user_status', { userId, status: 'online' });
+    
+    // Deliver pending messages from database
+    try {
+        const undeliveredMessages = await messageOperations.getUndeliveredMessages(userId);
         
-        socket.broadcast.emit('user_status', { userId, status: 'online' });
-        
-        // Deliver pending messages from database
-        try {
-            const undeliveredMessages = await messageOperations.getUndeliveredMessages(userId);
-            
-            if (undeliveredMessages.length > 0) {
-                console.log(`📬 Delivering ${undeliveredMessages.length} pending messages to ${userId}`);
-                undeliveredMessages.forEach(msg => {
-                    socket.emit('new_message', {
-                        id: msg.messageId,
-                        senderId: msg.senderId,
-                        receiverId: msg.receiverId,
-                        content: msg.content,
-                        type: msg.type,
-                        timestamp: msg.timestamp,
-                        status: msg.status,
-                        seenAt: msg.seenAt
-                    });
+        if (undeliveredMessages.length > 0) {
+            console.log(`📬 Delivering ${undeliveredMessages.length} pending messages to ${userId}`);
+            undeliveredMessages.forEach(msg => {
+                socket.emit('new_message', {
+                    id: msg.messageId,
+                    senderId: msg.senderId,
+                    receiverId: msg.receiverId,
+                    content: msg.content,
+                    type: msg.type,
+                    timestamp: msg.timestamp,
+                    status: msg.status,
+                    seenAt: msg.seenAt
                 });
-            }
-        } catch (error) {
-            console.error('❌ Error delivering pending messages:', error);
+            });
         }
-    });
-
+    } catch (error) {
+        console.error('❌ Error delivering pending messages:', error);
+    }
+});
     socket.on('send_message', async (data) => {
         console.log('\n' + '='.repeat(60));
         console.log('📨 INCOMING MESSAGE EVENT');
@@ -204,6 +214,7 @@ io.on('connection', (socket) => {
         console.log('  - From:', senderId);
         console.log('  - To:', receiverId);
         console.log('  - Type:', type);
+        console.log('  - Content:', content);  // ← CHECK THIS LINE IN YOUR CONSOLE
         
         try {
             // Validate input
@@ -232,15 +243,16 @@ io.on('connection', (socket) => {
             console.log('✅ Validation passed');
             
             const message = {
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                senderId: senderId,
-                receiverId: receiverId,
-                content: sanitizedContent,
-                type: type,
-                timestamp: Date.now(),
-                status: 'sent',
-                seenAt: null
-            };
+    id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+    senderId: senderId,
+    receiverId: receiverId,
+    content: sanitizedContent,
+    type: type,
+    timestamp: Date.now(),
+    status: 'sent',
+    seenAt: null,
+    replyTo: data.replyTo || null  // ← ADD THIS LINE
+};
             
             console.log('📝 Message ID:', message.id);
             
@@ -354,6 +366,67 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('delete_message', async (data) => {
+    const { messageId, userId, receiverId } = data;
+    
+    console.log(`🗑️ Delete message request:`, { messageId, userId });
+    
+    if (!messageId || !userId) {
+        socket.emit('error', { message: 'Invalid delete request' });
+        return;
+    }
+    
+    if (!/^\d{4}$/.test(userId)) {
+        socket.emit('error', { message: 'Invalid user ID format' });
+        return;
+    }
+    
+    try {
+        const message = await messageOperations.getMessageById(messageId);
+        
+        if (!message) {
+            socket.emit('error', { message: 'Message not found' });
+            return;
+        }
+        
+        if (message.senderId !== userId) {
+            socket.emit('error', { message: 'You can only delete your own messages' });
+            return;
+        }
+        
+        const deleted = await messageOperations.deleteMessage(messageId);
+        
+        if (deleted) {
+            console.log(`✅ Message ${messageId} deleted from database`);
+            
+            socket.emit('message_deleted', {
+                messageId: messageId,
+                deletedBy: userId
+            });
+            
+            if (receiverId) {
+                const receiverSocketId = activeUsers.get(receiverId);
+                if (receiverSocketId) {
+                    const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+                    if (receiverSocket) {
+                        receiverSocket.emit('message_deleted', {
+                            messageId: messageId,
+                            deletedBy: userId
+                        });
+                        console.log(`✅ Delete notification sent to receiver ${receiverId}`);
+                    }
+                }
+            }
+        } else {
+            socket.emit('error', { message: 'Failed to delete message' });
+        }
+        
+    } catch (error) {
+        console.error('❌ Error deleting message:', error);
+        socket.emit('error', { message: 'Failed to delete message' });
+    }
+});
+
    // FIXED WebRTC Call Signaling Section
 // Replace your existing call signaling section (lines ~380-520) with this:
 
@@ -410,7 +483,8 @@ socket.on('call_rejected', (data) => {
     }
 });
 
-// Handle WebRTC offer
+
+// Replace the call:offer handler with this improved version
 socket.on('call:offer', (data) => {
     const { to, from, offer, isVideoCall } = data;
     
@@ -418,34 +492,42 @@ socket.on('call:offer', (data) => {
     
     if (!to || !from || !offer) {
         console.log('❌ Invalid offer data');
+        socket.emit('call:declined', { 
+            reason: 'Invalid call data',
+            from: to 
+        });
         return;
     }
     
     const receiverSocketId = activeUsers.get(to);
-    if (receiverSocketId) {
-        const receiverSocket = io.sockets.sockets.get(receiverSocketId);
-        if (receiverSocket) {
-            receiverSocket.emit('call:offer', {
-                from: from,
-                offer: offer,
-                isVideoCall: isVideoCall
-            });
-            console.log(`✅ Call offer sent to ${to}`);
-        } else {
-            console.log(`⚠️ Receiver socket not found for ${to}`);
-            socket.emit('call:declined', { 
-                reason: 'User not available',
-                from: to 
-            });
-        }
-    } else {
+    if (!receiverSocketId) {
         console.log(`⚠️ Receiver ${to} is offline`);
         socket.emit('call:declined', { 
-            reason: 'User is offline',
+            reason: 'User is offline or unavailable',
             from: to 
         });
+        return;
     }
+    
+    const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+    if (!receiverSocket) {
+        console.log(`⚠️ Receiver socket not found for ${to}`);
+        activeUsers.delete(to); // Clean up stale entry
+        socket.emit('call:declined', { 
+            reason: 'User is not available',
+            from: to 
+        });
+        return;
+    }
+    
+    receiverSocket.emit('call:offer', {
+        from: from,
+        offer: offer,
+        isVideoCall: isVideoCall
+    });
+    console.log(`✅ Call offer sent to ${to}`);
 });
+
 
 // Handle WebRTC answer
 socket.on('call:answer', (data) => {
@@ -518,7 +600,7 @@ socket.on('call:accepted', (data) => {
     }
 });
 
-// Handle call declined (from call window decline button)
+// Handle call declined (from call window decline/end button)
 socket.on('call:declined', (data) => {
     const { to, from, reason } = data;
     
@@ -529,11 +611,11 @@ socket.on('call:declined', (data) => {
         return;
     }
     
-    const callerSocketId = activeUsers.get(to);
-    if (callerSocketId) {
-        const callerSocket = io.sockets.sockets.get(callerSocketId);
-        if (callerSocket) {
-            callerSocket.emit('call:declined', { 
+    const receiverSocketId = activeUsers.get(to);
+    if (receiverSocketId) {
+        const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+        if (receiverSocket) {
+            receiverSocket.emit('call:declined', { 
                 reason: reason || 'Call declined by user',
                 from: from 
             });
