@@ -63,6 +63,7 @@ class PaintApp {
         // Tool buttons
         document.querySelectorAll('.paint-tool-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent modal from closing
                 document.querySelectorAll('.paint-tool-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 this.currentTool = btn.dataset.tool;
@@ -91,6 +92,7 @@ class PaintApp {
         // Color presets
         document.querySelectorAll('.paint-color-preset').forEach(btn => {
             btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent modal from closing
                 this.currentColor = btn.dataset.color;
                 if (colorPicker) colorPicker.value = this.currentColor;
             });
@@ -108,19 +110,46 @@ class PaintApp {
         this.canvas.addEventListener('touchend', this.handleMouseUp.bind(this));
         
         // Action buttons
-        document.getElementById('undoBtn')?.addEventListener('click', () => this.undo());
-        document.getElementById('redoBtn')?.addEventListener('click', () => this.redo());
-        document.getElementById('clearBtn')?.addEventListener('click', () => this.clearCanvas());
+        document.getElementById('undoBtn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.undo();
+        });
+        document.getElementById('redoBtn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.redo();
+        });
+        document.getElementById('clearBtn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.clearCanvas();
+        });
         
         // Page navigation
-        document.getElementById('prevPageBtn')?.addEventListener('click', () => this.prevPage());
-        document.getElementById('nextPageBtn')?.addEventListener('click', () => this.nextPage());
-        document.getElementById('addPageBtn')?.addEventListener('click', () => this.addPage());
-        document.getElementById('deletePageBtn')?.addEventListener('click', () => this.deletePage());
+        document.getElementById('prevPageBtn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.prevPage();
+        });
+        document.getElementById('nextPageBtn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.nextPage();
+        });
+        document.getElementById('addPageBtn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.addPage();
+        });
+        document.getElementById('deletePageBtn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.deletePage();
+        });
         
         // Save and send
-        document.getElementById('savePaintBtn')?.addEventListener('click', () => this.saveDrawing());
-        document.getElementById('sendPaintBtn')?.addEventListener('click', () => this.sendDrawing());
+        document.getElementById('savePaintBtn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.saveDrawing();
+        });
+        document.getElementById('sendPaintBtn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.sendDrawing();
+        });
     }
     
     handleMouseDown(e) {
@@ -544,18 +573,30 @@ function closePaintModal() {
 function setupPaintModal() {
     const openPaintBtn = document.getElementById('openPaintBtn');
     const closePaintBtn = document.getElementById('closePaintBtn');
-    const paintOverlay = document.getElementById('paintOverlay');
     
     if (openPaintBtn) {
-        openPaintBtn.addEventListener('click', openPaintModal);
+        openPaintBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openPaintModal();
+        });
     }
     
     if (closePaintBtn) {
-        closePaintBtn.addEventListener('click', closePaintModal);
+        closePaintBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closePaintModal();
+        });
     }
     
-    if (paintOverlay) {
-        paintOverlay.addEventListener('click', closePaintModal);
+    // Click outside modal to close - FIXED
+    const paintModal = document.getElementById('paintModal');
+    if (paintModal) {
+        paintModal.addEventListener('click', (e) => {
+            // Only close if clicking the modal background (not the content)
+            if (e.target === paintModal) {
+                closePaintModal();
+            }
+        });
     }
     
     // Close on Escape key
