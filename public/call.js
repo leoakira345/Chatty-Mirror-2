@@ -67,18 +67,16 @@ class CallManager {
     }
 
     connectSocket() {
-    // Check if Socket.IO is loaded
     if (typeof io === 'undefined') {
         console.error('❌ Socket.IO library not loaded!');
         alert('Socket.IO library failed to load. Please check your internet connection.');
         return;
     }
     
-    const serverUrl = 'http://localhost:3000';
+    // 🔧 CHANGE THIS LINE - Use your deployed backend URL
+    const serverUrl = 'https://chatty-mirror-2.onrender.com';  // Replace with YOUR backend URL
     
     console.log('🔌 Attempting connection to:', serverUrl);
-    console.log('🔌 Current page:', window.location.href);
-    console.log('🔌 Socket.IO version:', io.version);
     
     this.socket = io(serverUrl, {
         transports: ['websocket', 'polling'],
@@ -89,7 +87,7 @@ class CallManager {
         forceNew: true,
         autoConnect: true
     });
-
+    
     this.socket.on('connect', () => {
         console.log('✅ Socket connected:', this.socket.id);
         
