@@ -1453,6 +1453,16 @@ return `
         }
     });
 
+    // ✅ Attach click handlers to all images
+messagesArea.querySelectorAll('.message-image').forEach(img => {
+    img.style.cursor = 'pointer';
+    img.addEventListener('click', function() {
+        const imageSrc = this.getAttribute('data-image-src') || this.src;
+        const imageName = this.getAttribute('data-image-name') || this.alt;
+        openImageModal(imageSrc, imageName);
+    });
+});
+
     
         // ADD LONG-PRESS HANDLERS FOR MOBILE
         const messageContents = messagesArea.querySelectorAll('.message-content');
