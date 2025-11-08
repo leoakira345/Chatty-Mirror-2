@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paint Studio</title>
+    <link rel="stylesheet" href="paint.css">
+</head>
+<body>
+    <div class="container">
+        <button id="openPaintBtn" class="paint-open-btn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+            Open Paint Studio
+        </button>
+    </div>
+
+    <!-- Paint Modal -->
+    <div id="paintModal" class="paint-modal">
+        <div class="paint-modal-content">
+            <!-- Header -->
+            <div class="paint-header">
+                <div class="paint-header-left">
+                    <h2>🎨 Paint Studio</h2>
+                </div>
+                <div class="paint-header-right">
+                    <button id="savePaintBtn" class="paint-action-btn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                            <polyline points="17 21 17 13 7 13 7 21"/>
+                            <polyline points="7 3 7 8 15 8"/>
+                        </svg>
+                        <span>Save</span>
+                    </button>
+                    <button id="sendPaintBtn" class="paint-action-btn" style="background: #10b981; color: white;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"/>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                        </svg>
+                        <span>Send</span>
+                    </button>
+                    <button id="closePaintBtn" class="paint-close-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Toolbar -->
+            <div class="paint-toolbar">
+                <!-- Tools Section -->
+                <div class="paint-toolbar-section">
+                    <div class="paint-toolbar-label">Tools</div>
+                    <div class="paint-tools">
+                        <button class="paint-tool-btn active" data-tool="brush" title="Brush">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/>
+                                <path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>
+                            </svg>
+                        </button>
+                        <button class="paint-tool-btn" data-tool="pencil" title="Pencil">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="2" x2="22" y2="6"/>
+                                <path d="M7.5 20.5 19 9l-4-4L3.5 16.5 2 22z"/>
+                            </svg>
+                        </button>
+                        <button class="paint-tool-btn" data-tool="eraser" title="Eraser">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.5L13 21"/>
+                                <path d="M22 21H7"/>
+                                <path d="m5 11 9 9"/>
+                            </svg>
+                        </button>
+                        <button class="paint-tool-btn" data-tool="line" title="Line">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="5" y1="19" x2="19" y2="5"/>
+                            </svg>
+                        </button>
+                        <button class="paint-tool-btn" data-tool="rectangle" title="Rectangle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            </svg>
+                        </button>
+                        <button class="paint-tool-btn" data-tool="circle" title="Circle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                            </svg>
+                        </button>
+                        <button class="paint-tool-btn" data-tool="fill" title="Fill">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m4 16 6-6 6 6 6-6"/>
+                                <path d="M14 10V2"/>
+                                <circle cx="12" cy="18" r="4"/>
+                            </svg>
+                        </button>
+                        <button class="paint-tool-btn" data-tool="text" title="Text">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="4 7 4 4 20 4 20 7"/>
+                                <line x1="9" y1="20" x2="15" y2="20"/>
+                                <line x1="12" y1="4" x2="12" y2="20"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Brush Size Section -->
+                <div class="paint-toolbar-section">
+                    <div class="paint-toolbar-label">Brush Size: <span id="brushSizeValue">5</span>px</div>
+                    <input type="range" id="brushSize" class="paint-slider" min="1" max="50" value="5">
+                </div>
+
+                <!-- Color Section -->
+                <div class="paint-toolbar-section">
+                    <div class="paint-toolbar-label">Color</div>
+                    <div class="paint-color-picker">
+                        <input type="color" id="colorPicker" class="paint-color-input" value="#000000">
+                        <div class="paint-color-presets">
+                            <button class="paint-color-preset" data-color="#000000" style="background: #000000;" title="Black"></button>
+                            <button class="paint-color-preset" data-color="#ffffff" style="background: #ffffff; border-color: #000;" title="White"></button>
+                            <button class="paint-color-preset" data-color="#ef4444" style="background: #ef4444;" title="Red"></button>
+                            <button class="paint-color-preset" data-color="#f59e0b" style="background: #f59e0b;" title="Orange"></button>
+                            <button class="paint-color-preset" data-color="#eab308" style="background: #eab308;" title="Yellow"></button>
+                            <button class="paint-color-preset" data-color="#22c55e" style="background: #22c55e;" title="Green"></button>
+                            <button class="paint-color-preset" data-color="#3b82f6" style="background: #3b82f6;" title="Blue"></button>
+                            <button class="paint-color-preset" data-color="#8b5cf6" style="background: #8b5cf6;" title="Purple"></button>
+                            <button class="paint-color-preset" data-color="#ec4899" style="background: #ec4899;" title="Pink"></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions Section -->
+                <div class="paint-toolbar-section">
+                    <div class="paint-toolbar-label">Actions</div>
+                    <div class="paint-actions">
+                        <button id="undoBtn" class="paint-action-small-btn" title="Undo">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 7v6h6"/>
+                                <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
+                            </svg>
+                        </button>
+                        <button id="redoBtn" class="paint-action-small-btn" title="Redo">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 7v6h-6"/>
+                                <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/>
+                            </svg>
+                        </button>
+                        <button id="clearBtn" class="paint-action-small-btn" title="Clear Canvas">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Canvas Area -->
+            <div class="paint-canvas-container">
+                <canvas id="paintCanvas" class="paint-canvas"></canvas>
+            </div>
+
+            <!-- Page Navigation -->
+            <div class="paint-pages">
+                <button id="prevPageBtn" class="paint-page-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                    <span>Previous</span>
+                </button>
+                
+                <div class="paint-page-info">
+                    Page <span id="currentPageNum">1</span> of <span id="totalPagesNum">1</span>
+                </div>
+                
+                <button id="nextPageBtn" class="paint-page-btn">
+                    <span>Next</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                </button>
+                
+                <button id="addPageBtn" class="paint-page-btn" style="margin-left: auto;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"/>
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    <span>Add Page</span>
+                </button>
+                
+                <button id="deletePageBtn" class="paint-page-btn delete-page-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    </svg>
+                    <span>Delete Page</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="paint.js"></script>
+    <script>
+        // Initialize paint modal setup when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            setupPaintModal();
+            
+            // Stop propagation on modal content clicks
+            const modalContent = document.querySelector('.paint-modal-content');
+            if (modalContent) {
+                modalContent.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                });
+            }
+        });
+        
+        // Mock variables for standalone demo
+        let selectedFriend = { id: 'friend1', name: 'Friend' };
+        let socket = { connected: true, emit: () => console.log('Message sent!') };
+        let currentUser = { id: 'user1' };
+        let messages = [];
+        
+        function renderMessages() {}
+        function scrollToBottom() {}
+    </script>
+</body>
+</html>
