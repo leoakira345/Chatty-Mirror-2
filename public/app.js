@@ -56,6 +56,15 @@ const isAndroid = platform === 'android';
 
 console.log('🔍 Platform:', platform, '| Native:', isNativeApp, '| Android:', isAndroid);
 
+
+// HTML Entity Decoder
+function decodeHtmlEntities(text) {
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = text;
+    return textarea.value;
+}
+
+
 // ==========================================
 // CONFIGURATION - AUTO-DETECT ENVIRONMENT
 // ==========================================
@@ -77,6 +86,127 @@ console.log('🔧 API URL:', API_URL);
 console.log('🔧 Socket URL:', SOCKET_URL);
 
 // ==========================================
+// DARK MODE THEME MANAGER - ADD THIS ENTIRE SECTION
+// ==========================================
+class ThemeManager {
+    constructor() {
+        this.theme = this.getStoredTheme() || this.getSystemTheme();
+        this.init();
+    }
+
+    init() {
+        this.applyTheme(this.theme);
+        this.createToggleButton();
+        this.watchSystemTheme();
+        setTimeout(() => {
+            document.body.classList.remove('preload');
+        }, 100);
+    }
+
+    createToggleButton() {
+        const headerActions = document.querySelector('.header-actions');
+        if (!headerActions) return;
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'theme-toggle';
+        toggleBtn.setAttribute('aria-label', 'Toggle theme');
+        toggleBtn.innerHTML = `
+            <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+        `;
+
+        const settingsBtn = headerActions.querySelector('.settings-btn');
+        if (settingsBtn) {
+            headerActions.insertBefore(toggleBtn, settingsBtn);
+        } else {
+            headerActions.appendChild(toggleBtn);
+        }
+
+        toggleBtn.addEventListener('click', () => this.toggleTheme());
+    }
+
+    getSystemTheme() {
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            return 'dark';
+        }
+        return 'light';
+    }
+
+    getStoredTheme() {
+        return localStorage.getItem('theme');
+    }
+
+    setStoredTheme(theme) {
+        localStorage.setItem('theme', theme);
+    }
+
+    applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        this.theme = theme;
+        this.updateMetaThemeColor(theme);
+    }
+
+    updateMetaThemeColor(theme) {
+        let metaThemeColor = document.querySelector('meta[name="theme-color"]');
+        if (!metaThemeColor) {
+            metaThemeColor = document.createElement('meta');
+            metaThemeColor.setAttribute('name', 'theme-color');
+            document.head.appendChild(metaThemeColor);
+        }
+        metaThemeColor.setAttribute('content', theme === 'dark' ? '#1e293b' : '#2563eb');
+    }
+
+    toggleTheme() {
+        const newTheme = this.theme === 'dark' ? 'light' : 'dark';
+        this.applyTheme(newTheme);
+        this.setStoredTheme(newTheme);
+        window.dispatchEvent(new CustomEvent('themechange', { detail: { theme: newTheme } }));
+    }
+
+    watchSystemTheme() {
+        if (!window.matchMedia) return;
+
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        
+        if (mediaQuery.addEventListener) {
+            mediaQuery.addEventListener('change', (e) => {
+                if (!this.getStoredTheme()) {
+                    this.applyTheme(e.matches ? 'dark' : 'light');
+                }
+            });
+        }
+    }
+
+    getCurrentTheme() {
+        return this.theme;
+    }
+
+    setTheme(theme) {
+        if (theme === 'dark' || theme === 'light') {
+            this.applyTheme(theme);
+            this.setStoredTheme(theme);
+        }
+    }
+}
+
+let themeManager;
+
+// Helper functions
+function isDarkMode() {
+    return document.documentElement.getAttribute('data-theme') === 'dark';
+}
+
+function onThemeChange(callback) {
+    window.addEventListener('themechange', (e) => {
+        callback(e.detail.theme);
+    });
+}
+
+// ==========================================
 // SOCKET.IO
 // ==========================================
 let socket = null;
@@ -89,6 +219,10 @@ let friends = [];
 let selectedFriend = null;
 let messages = [];
 let typingTimeout = null;
+
+// REPLY MESSAGE STATE
+// ==========================================
+let replyingTo = null; // Stores the message being replied to
 
 // ==========================================
 // KARAOKE STATE - UPDATED
@@ -155,6 +289,106 @@ window.onYouTubeIframeAPIReady = function() {
 // ==========================================
 const emojis = ['😀', '😂', '😍', '🥰', '😎', '🤔', '👍', '❤️', '🔥', '✨', '🎉', '💯', '😊', '🙌', '💪', '🌟'];
 
+
+// ==========================================
+// SOUND EFFECTS - WhatsApp Style
+// ==========================================
+class SoundManager {
+    constructor() {
+        this.audioContext = null;
+        this.enabled = true;
+        this.volume = 0.5; // 50% volume
+        this.initAudioContext();
+    }
+
+    initAudioContext() {
+        try {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {
+            console.warn('Web Audio API not supported');
+            this.enabled = false;
+        }
+    }
+
+    // Generate WhatsApp-style "pop" sound for sent messages
+    playSentSound() {
+        if (!this.enabled || !this.audioContext) return;
+
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+
+        oscillator.frequency.value = 600;
+        oscillator.type = 'sine';
+
+        gainNode.gain.setValueAtTime(this.volume * 0.3, this.audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.1);
+
+        oscillator.start(this.audioContext.currentTime);
+        oscillator.stop(this.audioContext.currentTime + 0.1);
+    }
+
+    // Generate WhatsApp-style notification sound for received messages
+    playReceivedSound() {
+        if (!this.enabled || !this.audioContext) return;
+
+        const times = [0, 0.1];
+        const frequencies = [800, 600];
+
+        times.forEach((time, index) => {
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+
+            oscillator.frequency.value = frequencies[index];
+            oscillator.type = 'sine';
+
+            const startTime = this.audioContext.currentTime + time;
+            gainNode.gain.setValueAtTime(this.volume * 0.4, startTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.15);
+
+            oscillator.start(startTime);
+            oscillator.stop(startTime + 0.15);
+        });
+    }
+
+    // Generate subtle typing sound
+    playTypingSound() {
+        if (!this.enabled || !this.audioContext) return;
+
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+
+        oscillator.frequency.value = 300 + Math.random() * 100;
+        oscillator.type = 'sine';
+
+        gainNode.gain.setValueAtTime(this.volume * 0.1, this.audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.05);
+
+        oscillator.start(this.audioContext.currentTime);
+        oscillator.stop(this.audioContext.currentTime + 0.05);
+    }
+
+    // Enable/disable sounds
+    setEnabled(enabled) {
+        this.enabled = enabled;
+    }
+
+    // Set volume (0.0 to 1.0)
+    setVolume(volume) {
+        this.volume = Math.max(0, Math.min(1, volume));
+    }
+}
+
+// Initialize sound manager
+let soundManager;
 // ==========================================
 // DOM ELEMENTS
 // ==========================================
@@ -220,6 +454,10 @@ const countdownNumber = document.getElementById('countdownNumber');
 // INITIALIZE
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
+    // Initialize dark mode FIRST
+    document.body.classList.add('preload');
+    themeManager = new ThemeManager();
+    soundManager = new SoundManager(); // ← ADD THIS LINE
     loadYouTubeAPI();
     await initializeApp();
     setupEventListeners();
@@ -350,15 +588,20 @@ function initializeSocket() {
     });
 
     socket.on('new_message', (message) => {
-        console.log('📨 New message received:', {
-            id: message.id,
-            type: message.type,
-            from: message.senderId,
-            to: message.receiverId,
-            contentLength: message.content?.length
-        });
+    console.log('📨 New message received:', {
+        id: message.id,
+        type: message.type,
+        from: message.senderId,
+        to: message.receiverId,
+        contentLength: message.content?.length
+    });
 
-        const isRelevant = selectedFriend && (
+    // Play received sound if message is from someone else
+    if (message.senderId !== currentUser.id && soundManager) {
+        soundManager.playReceivedSound(); // ← ADD THIS LINE
+    }
+
+    const isRelevant = selectedFriend && (
             (message.senderId === selectedFriend.id && message.receiverId === currentUser.id) ||
             (message.senderId === currentUser.id && message.receiverId === selectedFriend.id)
         );
@@ -446,6 +689,17 @@ function initializeSocket() {
         }
     });
 
+    socket.on('message_deleted', (data) => {
+        console.log('🗑️ Message deleted:', data.messageId);
+        
+        const index = messages.findIndex(m => m.id === data.messageId);
+        if (index !== -1) {
+            messages.splice(index, 1);
+            renderMessages();
+            console.log('✅ Message removed from UI');
+        }
+    });
+
     // ==========================================
     // INCOMING CALL HANDLER - NEW
     // ==========================================
@@ -518,6 +772,46 @@ async function checkServerStatus() {
     }
 }
 
+// ==========================================
+// DELETE MESSAGE FUNCTION
+// ==========================================
+function deleteMessage(messageId) {
+    const message = messages.find(m => m.id === messageId);
+    
+    if (!message) {
+        alert('Message not found');
+        return;
+    }
+    
+    if (message.senderId !== currentUser.id) {
+        alert('You can only delete your own messages');
+        return;
+    }
+    
+    if (!confirm('Delete this message? This cannot be undone.')) {
+        return;
+    }
+    
+    console.log('🗑️ Deleting message:', messageId);
+    
+    if (!socket || !socket.connected) {
+        alert('Not connected to server');
+        return;
+    }
+    
+    socket.emit('delete_message', {
+        messageId: messageId,
+        userId: currentUser.id,
+        receiverId: selectedFriend.id
+    });
+    
+    const index = messages.findIndex(m => m.id === messageId);
+    if (index !== -1) {
+        messages.splice(index, 1);
+        renderMessages();
+    }
+}
+
 function markMessageAsSeen(messageId) {
     if (!socket || !socket.connected) return;
     
@@ -579,6 +873,11 @@ function setupEventListeners() {
 
     messageInput.addEventListener('input', () => {
         if (!selectedFriend || !socket || !socket.connected) return;
+
+        // Play typing sound
+        if (soundManager) {
+            soundManager.playTypingSound(); // ← ADD THIS LINE
+        }
 
         socket.emit('typing', {
             senderId: currentUser.id,
@@ -699,6 +998,55 @@ function renderFriends() {
         });
     });
 }
+
+// ==========================================
+// LONG-PRESS HANDLER FOR MOBILE
+// ==========================================
+let longPressTimer = null;
+let longPressTarget = null;
+
+function handleLongPressStart(e) {
+    // Only for touch devices
+    if (!e.touches) return;
+    
+    const messageContent = e.currentTarget;
+    longPressTarget = messageContent;
+    
+    // Start 1 second timer
+    longPressTimer = setTimeout(() => {
+        messageContent.classList.add('show-mobile-buttons');
+        
+        // Add haptic feedback if available
+        if (navigator.vibrate) {
+            navigator.vibrate(50);
+        }
+    }, 1000);
+}
+
+function handleLongPressEnd(e) {
+    if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+    }
+}
+
+function handleLongPressMove(e) {
+    // Cancel long press if finger moves
+    if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+    }
+}
+
+// Click outside to hide buttons
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.message-content')) {
+        document.querySelectorAll('.message-content.show-mobile-buttons').forEach(el => {
+            el.classList.remove('show-mobile-buttons');
+        });
+    }
+});
+
 
 function selectFriend(friendId) {
     selectedFriend = friends.find(f => f.id === friendId);
@@ -864,32 +1212,111 @@ function renderMessages() {
     messagesArea.innerHTML = messages.map(msg => {
         const isOwn = msg.senderId === currentUser.id;
         const messageStatus = getMessageStatus(msg, isOwn);
+        
+        // Parse reply data if exists
+        let replyPreview = '';
+        if (msg.replyTo) {
+            const replyUsername = msg.replyTo.senderId === currentUser.id ? 'You' : selectedFriend.username;
+            
+            let replyContent = msg.replyTo.content;
+            if (msg.replyTo.type === 'image') {
+                replyContent = '📷 Image';
+            } else if (msg.replyTo.type === 'video') {
+                replyContent = '🎥 Video';
+            } else if (msg.replyTo.type === 'audio') {
+                replyContent = '🎤 Voice Message';
+            } else if (msg.replyTo.type === 'file') {
+                replyContent = '📎 File';
+            } else if (replyContent.length > 50) {
+                replyContent = replyContent.substring(0, 50) + '...';
+            }
+            
+            // Create safe text content for reply
+const usernameDiv = document.createElement('div');
+usernameDiv.textContent = replyUsername;
+const safeReplyUsername = usernameDiv.innerHTML;
 
-        if (msg.type === 'image') {
-            const fileData = JSON.parse(msg.content);
-            return `
-                <div class="message ${isOwn ? 'own' : ''}">
-                    <div class="message-content">
-                        <img src="${fileData.data}" 
-                             alt="${escapeHtml(fileData.name)}" 
-                             class="message-image" 
-                             loading="lazy"
-                             data-image-src="${fileData.data}"
-                             data-image-name="${escapeHtml(fileData.name)}">
-                        <p style="font-size: 0.75rem; margin-top: 0.5rem; opacity: 0.8;">
-                            ${escapeHtml(fileData.name)}
-                            ${messageStatus}
-                        </p>
-                    </div>
-                </div>
-            `;
+const contentDiv = document.createElement('div');
+contentDiv.textContent = replyContent;
+const safeReplyContent = contentDiv.innerHTML;
+
+replyPreview = `
+    <div class="reply-preview" onclick="scrollToMessage('${msg.replyTo.id}')">
+        <div class="reply-line"></div>
+        <div class="reply-content">
+            <div class="reply-username">${safeReplyUsername}</div>
+            <div class="reply-text">${safeReplyContent}</div>
+        </div>
+    </div>
+`;
         }
+
+       if (msg.type === 'image') {
+    const fileData = JSON.parse(msg.content);
+    
+    // Create safe filename
+    const nameDiv = document.createElement('div');
+    nameDiv.textContent = fileData.name;
+    const safeFileName = nameDiv.innerHTML;
+    
+    return `
+        <div class="message ${isOwn ? 'own' : ''}" data-message-id="${msg.id}">
+            <div class="message-content">
+                ${replyPreview}
+                <button class="message-reply-btn" onclick="handleReplyClick('${msg.id}')" title="Reply">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 10l-5 5 5 5"/>
+                        <path d="M20 4v7a4 4 0 0 1-4 4H4"/>
+                    </svg>
+                </button>
+                ${isOwn ? `
+                    <button class="message-delete-btn" onclick="handleDeleteClick('${msg.id}')" title="Delete">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                            <line x1="10" y1="11" x2="10" y2="17"/>
+                            <line x1="14" y1="11" x2="14" y2="17"/>
+                        </svg>
+                    </button>
+                ` : ''}
+                <img src="${fileData.data}" 
+                     alt="${safeFileName}" 
+                     class="message-image" 
+                     loading="lazy"
+                     data-image-src="${fileData.data}"
+                     data-image-name="${safeFileName}">
+                <p style="font-size: 0.75rem; margin-top: 0.5rem; opacity: 0.8;">
+                    ${safeFileName}
+                    ${messageStatus}
+                </p>
+            </div>
+        </div>
+    `;
+}
 
         if (msg.type === 'video') {
             const fileData = JSON.parse(msg.content);
             return `
-                <div class="message ${isOwn ? 'own' : ''}">
+                <div class="message ${isOwn ? 'own' : ''}" data-message-id="${msg.id}">
+                    <button class="message-reply-btn" data-message-id="${msg.id}" title="Reply">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 10l-5 5 5 5"/>
+                            <path d="M20 4v7a4 4 0 0 1-4 4H4"/>
+                        </svg>
+                    </button>
+                    ${isOwn ? `
+                        <button class="message-delete-btn" data-message-id="${msg.id}" title="Delete">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                <line x1="10" y1="11" x2="10" y2="17"/>
+                                <line x1="14" y1="11" x2="14" y2="17"/>
+                            </svg>
+                        </button>
+                    ` : ''}
                     <div class="message-content">
+                        ${replyPreview}
                         <video src="${fileData.data}" controls class="message-video" preload="metadata"></video>
                         <p style="font-size: 0.75rem; margin-top: 0.5rem; opacity: 0.8;">
                             ${escapeHtml(fileData.name)}
@@ -903,8 +1330,26 @@ function renderMessages() {
         if (msg.type === 'audio') {
             const fileData = JSON.parse(msg.content);
             return `
-                <div class="message ${isOwn ? 'own' : ''}">
+                <div class="message ${isOwn ? 'own' : ''}" data-message-id="${msg.id}">
+                    <button class="message-reply-btn" data-message-id="${msg.id}" title="Reply">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 10l-5 5 5 5"/>
+                            <path d="M20 4v7a4 4 0 0 1-4 4H4"/>
+                        </svg>
+                    </button>
+                    ${isOwn ? `
+                        <button class="message-delete-btn" data-message-id="${msg.id}" title="Delete">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                <line x1="10" y1="11" x2="10" y2="17"/>
+                                <line x1="14" y1="11" x2="14" y2="17"/>
+                            </svg>
+                        </button>
+                    ` : ''}
                     <div class="message-content">
+                        ${replyPreview}
                         <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem;">
                             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 24px; height: 24px; flex-shrink: 0;">
                                 <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
@@ -925,8 +1370,26 @@ function renderMessages() {
         if (msg.type === 'file') {
             const fileData = JSON.parse(msg.content);
             return `
-                <div class="message ${isOwn ? 'own' : ''}">
+                <div class="message ${isOwn ? 'own' : ''}" data-message-id="${msg.id}">
+                    <button class="message-reply-btn" data-message-id="${msg.id}" title="Reply">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 10l-5 5 5 5"/>
+                            <path d="M20 4v7a4 4 0 0 1-4 4H4"/>
+                        </svg>
+                    </button>
+                    ${isOwn ? `
+                        <button class="message-delete-btn" data-message-id="${msg.id}" title="Delete">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                <line x1="10" y1="11" x2="10" y2="17"/>
+                                <line x1="14" y1="11" x2="14" y2="17"/>
+                            </svg>
+                        </button>
+                    ` : ''}
                     <div class="message-content">
+                        ${replyPreview}
                         <div class="file-message">
                             <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -948,31 +1411,62 @@ function renderMessages() {
             `;
         }
 
-        return `
-            <div class="message ${isOwn ? 'own' : ''}">
-                <div class="message-content">
-                    ${escapeHtml(msg.content)}
-                    ${messageStatus}
-                </div>
-            </div>
-        `;
+        // Text messages - SIMPLIFIED FIX
+const textDiv = document.createElement('div');
+textDiv.textContent = msg.content;
+
+return `
+    <div class="message ${isOwn ? 'own' : ''}" data-message-id="${msg.id}">
+        <div class="message-content">
+            ${replyPreview}
+            <button class="message-reply-btn" onclick="handleReplyClick('${msg.id}')" title="Reply">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 10l-5 5 5 5"/>
+                    <path d="M20 4v7a4 4 0 0 1-4 4H4"/>
+                </svg>
+            </button>
+            ${isOwn ? `
+                <button class="message-delete-btn" onclick="handleDeleteClick('${msg.id}')" title="Delete">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        <line x1="10" y1="11" x2="10" y2="17"/>
+                        <line x1="14" y1="11" x2="14" y2="17"/>
+                    </svg>
+                </button>
+            ` : ''}
+            <span class="message-text-${msg.id}"></span>
+            ${messageStatus}
+        </div>
+    </div>
+`;
     }).join('');
 
-    const messageImages = messagesArea.querySelectorAll('.message-image');
-    messageImages.forEach(img => {
-        img.addEventListener('click', function() {
-            const imageSrc = this.getAttribute('data-image-src') || this.src;
-            const imageName = this.getAttribute('data-image-name') || '';
-            openImageModal(imageSrc, imageName);
-        });
+    // ✅ SET TEXT CONTENT SAFELY (fixes apostrophes)
+    messages.forEach(msg => {
+        if (msg.type === 'text') {
+            const textSpan = messagesArea.querySelector(`.message-text-${msg.id}`);
+            if (textSpan) {
+                textSpan.textContent = msg.content;
+            }
+        }
     });
+
+    
+        // ADD LONG-PRESS HANDLERS FOR MOBILE
+        const messageContents = messagesArea.querySelectorAll('.message-content');
+        messageContents.forEach(content => {
+            content.addEventListener('touchstart', handleLongPressStart, { passive: true });
+            content.addEventListener('touchend', handleLongPressEnd, { passive: true });
+            content.addEventListener('touchmove', handleLongPressMove, { passive: true });
+        });
 }
 
 function getMessageStatus(msg, isOwn) {
     if (!isOwn) return '';
     
     const status = msg.status || 'sent';
-    
     if (status === 'seen') {
         return `
             <span class="message-status seen tick-double">
@@ -992,6 +1486,83 @@ function getMessageStatus(msg, isOwn) {
                 </svg>
             </span>
         `;
+    }
+}
+
+function setReplyMessage(messageId) {
+    const message = messages.find(m => m.id === messageId);
+    if (!message) return;
+    
+    replyingTo = message;
+    showReplyBar();
+    messageInput.focus();
+}
+
+function showReplyBar() {
+    if (!replyingTo) return;
+    
+    // Remove existing reply bar if any
+    const existingBar = document.querySelector('.reply-bar');
+    if (existingBar) existingBar.remove();
+    
+    const replyBar = document.createElement('div');
+    replyBar.className = 'reply-bar';
+    
+    const isOwnMessage = replyingTo.senderId === currentUser.id;
+    const username = isOwnMessage ? 'You' : selectedFriend.username;
+    
+    let content = replyingTo.content;
+    if (replyingTo.type === 'image') {
+        content = '📷 Image';
+    } else if (replyingTo.type === 'video') {
+        content = '🎥 Video';
+    } else if (replyingTo.type === 'audio') {
+        content = '🎤 Voice Message';
+    } else if (replyingTo.type === 'file') {
+        const fileData = JSON.parse(replyingTo.content);
+        content = `📎 ${fileData.name}`;
+    } else if (content.length > 50) {
+        content = content.substring(0, 50) + '...';
+    }
+    
+    replyBar.innerHTML = `
+        <div class="reply-bar-line"></div>
+        <div class="reply-bar-content">
+            <div class="reply-bar-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 10l-5 5 5 5"/>
+                    <path d="M20 4v7a4 4 0 0 1-4 4H4"/>
+                </svg>
+                <span class="reply-bar-username">${escapeHtml(username)}</span>
+            </div>
+            <div class="reply-bar-text">${escapeHtml(content)}</div>
+        </div>
+        <button class="reply-bar-close" onclick="cancelReply()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    `;
+    
+    const inputArea = document.querySelector('.input-area');
+    inputArea.insertBefore(replyBar, inputArea.firstChild);
+}
+
+function cancelReply() {
+    replyingTo = null;
+    const replyBar = document.querySelector('.reply-bar');
+    if (replyBar) replyBar.remove();
+}
+
+function scrollToMessage(messageId) {
+    const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (messageElement) {
+        messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        messageElement.classList.add('highlight');
+        setTimeout(() => {
+            messageElement.classList.remove('highlight');
+        }, 2000);
     }
 }
 
@@ -1029,16 +1600,32 @@ function sendMessage() {
         from: currentUser.id,
         to: selectedFriend.id,
         content: content.substring(0, 50) + '...',
+        hasReply: !!replyingTo,
         socketConnected: socket.connected,
         socketId: socket.id
     });
 
-    const tempMessage = {
-        id: 'temp_' + Date.now() + Math.random().toString(36).substr(2, 9),
+    // Create message data with reply info if exists
+    const messageData = {
         senderId: currentUser.id,
         receiverId: selectedFriend.id,
         content: content,
-        type: 'text',
+        type: 'text'
+    };
+
+    // Add reply information if replying to a message
+    if (replyingTo) {
+        messageData.replyTo = {
+            id: replyingTo.id,
+            senderId: replyingTo.senderId,
+            content: replyingTo.content,
+            type: replyingTo.type
+        };
+    }
+
+    const tempMessage = {
+        id: 'temp_' + Date.now() + Math.random().toString(36).substr(2, 9),
+        ...messageData,
         timestamp: Date.now(),
         status: 'sent'
     };
@@ -1047,15 +1634,16 @@ function sendMessage() {
     renderMessages();
     scrollToBottom();
 
+    // Play sent sound
+    if (soundManager) {
+        soundManager.playSentSound(); // ← ADD THIS LINE
+    }
+
     messageInput.value = '';
     emojiPicker.style.display = 'none';
-
-    const messageData = {
-        senderId: currentUser.id,
-        receiverId: selectedFriend.id,
-        content: content,
-        type: 'text'
-    };
+    
+    // Clear reply state
+    cancelReply();
 
     console.log('📨 Emitting send_message event:', messageData);
 
@@ -2485,28 +3073,49 @@ function startCall(type) {
 window.startCall = startCall;
 
 // ==========================================
-// PAINT MODAL FUNCTIONALITY (if you have it)
+// ==========================================
+// PAINT MODAL FUNCTIONALITY
 // ==========================================
 function setupPaintModal() {
+    const openPaintBtn = document.getElementById('openPaintBtn');
     const paintBtn = document.getElementById('paintBtn');
     
-    if (!paintBtn) {
-        console.log('⚠️ Paint button not found - skipping paint setup');
+    if (!openPaintBtn && !paintBtn) {
+        console.log('⚠️ Paint buttons not found - skipping paint setup');
         return;
     }
     
-    paintBtn.addEventListener('click', () => {
-        if (!selectedFriend) {
-            alert('Please select a friend first to send drawings');
-            return;
-        }
-        
-        window.open(
-            'paint.html',
-            'PaintWindow',
-            'width=1000,height=700,resizable=yes,scrollbars=yes'
-        );
-    });
+    // Handle the sidebar "Open Paint Studio" button
+    if (openPaintBtn) {
+        openPaintBtn.addEventListener('click', () => {
+            if (!selectedFriend) {
+                alert('Please select a friend first to send drawings');
+                return;
+            }
+            
+            window.open(
+                'paint.html',
+                'PaintWindow',
+                'width=1000,height=700,resizable=yes,scrollbars=yes'
+            );
+        });
+    }
+    
+    // Handle the input area paint button (if exists)
+    if (paintBtn) {
+        paintBtn.addEventListener('click', () => {
+            if (!selectedFriend) {
+                alert('Please select a friend first to send drawings');
+                return;
+            }
+            
+            window.open(
+                'paint.html',
+                'PaintWindow',
+                'width=1000,height=700,resizable=yes,scrollbars=yes'
+            );
+        });
+    }
     
     console.log('✅ Paint button setup complete');
 }
@@ -2528,8 +3137,53 @@ window.addFriend = addFriend;
 window.selectYouTubeVideo = selectYouTubeVideo;
 window.insertEmoji = insertEmoji;
 window.openImageModal = openImageModal;
-
+window.setReplyMessage = setReplyMessage;
+window.cancelReply = cancelReply;
+window.scrollToMessage = scrollToMessage;
+window.deleteMessage = deleteMessage;  // ← ADD THIS
 // ==========================================
 // END OF FILE
 // ==========================================
 console.log('✅ app.js loaded successfully');
+
+// ==========================================
+// KEYBOARD SHORTCUT FOR THEME TOGGLE
+// ==========================================
+document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
+        e.preventDefault();
+        if (themeManager) {
+            themeManager.toggleTheme();
+        }
+    }
+});
+
+// ==========================================
+// GLOBAL MESSAGE ACTION HANDLERS
+// ==========================================
+function handleReplyClick(messageId) {
+    console.log('💬 Reply clicked:', messageId);
+    if (messageId) {
+        setReplyMessage(messageId);
+    }
+}
+
+function handleDeleteClick(messageId) {
+    console.log('🗑️ Delete clicked:', messageId);
+    if (messageId) {
+        deleteMessage(messageId);
+    }
+}
+
+// Make them globally accessible
+window.handleReplyClick = handleReplyClick;
+window.handleDeleteClick = handleDeleteClick;
+
+// Reconnect when window regains focus (after call window closes)
+window.addEventListener('focus', () => {
+    if (socket && !socket.connected && currentUser) {
+        console.log('🔄 Window focused, reconnecting...');
+        socket.connect();
+        socket.emit('user_connected', currentUser.id);
+    }
+});
