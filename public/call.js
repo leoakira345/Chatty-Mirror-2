@@ -129,19 +129,20 @@ function initializeSocket() {
     console.log('🔌 Connecting to Socket.IO:', SOCKET_URL);
     
     socket = io(SOCKET_URL, {
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionAttempts: 5,
-        transports: ['websocket', 'polling']
+        reconnection: false, // Don't reconnect - this is a call-only window
+        transports: ['websocket', 'polling'],
+        query: {
+            isCallWindow: 'true' // Mark this as a call window
+        }
     });
 
     socket.on('connect', () => {
-        console.log('✅ Socket connected:', socket.id);
-        socket.emit('user_connected', myUserId);
+        console.log('✅ Call window socket connected:', socket.id);
+        // DON'T emit user_connected - main window already did that
     });
 
     socket.on('disconnect', () => {
-        console.log('❌ Socket disconnected');
+        console.log('❌ Call window socket disconnected');
     });
 
     // WebRTC Signaling Events
@@ -711,9 +712,9 @@ function cleanup() {
         peerConnection = null;
     }
     
-    if (socket) {
-        socket.disconnect();
-    }
+    // DON'T disconnect socket - it will make user appear offline in main window
+    // Just let the call window close naturally
+    console.log('✅ Cleanup complete - socket left connected for main window');
 }
 
 // ==========================================
