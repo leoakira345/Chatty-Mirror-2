@@ -667,25 +667,33 @@ socket.on('call:ended', (data) => {
     // ==========================================
 
     socket.on('disconnect', () => {
-        let disconnectedUserId = null;
-        for (const [userId, socketId] of activeUsers.entries()) {
-            if (socketId === socket.id) {
-                disconnectedUserId = userId;
-                activeUsers.delete(userId);
-                break;
-            }
+    // Check if this is a call window socket
+    const isCallWindow = socket.handshake.query?.isCallWindow === 'true';
+    
+    if (isCallWindow) {
+        console.log('📞 Call window closed:', socket.id, '(not marking user offline)');
+        return; // Don't mark user as offline - main window is still connected
+    }
+    
+    // Only mark user offline if main chat window disconnects
+    let disconnectedUserId = null;
+    for (const [userId, socketId] of activeUsers.entries()) {
+        if (socketId === socket.id) {
+            disconnectedUserId = userId;
+            activeUsers.delete(userId);
+            break;
         }
-        
-        if (disconnectedUserId) {
-            console.log(`👋 User ${disconnectedUserId} disconnected`);
-            console.log(`📊 Total active users: ${activeUsers.size}`);
-            socket.broadcast.emit('user_status', { 
-                userId: disconnectedUserId, 
-                status: 'offline' 
-            });
-        }
-    });
-
+    }
+    
+    if (disconnectedUserId) {
+        console.log(`👋 User ${disconnectedUserId} disconnected`);
+        console.log(`📊 Total active users: ${activeUsers.size}`);
+        socket.broadcast.emit('user_status', { 
+            userId: disconnectedUserId, 
+            status: 'offline' 
+        });
+    }
+});
     socket.on('error', (error) => {
         console.error('❌ Socket error:', error);
     });
