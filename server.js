@@ -598,10 +598,24 @@ socket.on('call:accepted', (data) => {
     if (callerSocketId) {
         const callerSocket = io.sockets.sockets.get(callerSocketId);
         if (callerSocket) {
+            // Notify caller that receiver accepted
             callerSocket.emit('call:accepted', { from: from });
             console.log(`✅ Acceptance notification sent to ${to}`);
+            
+            // Tell caller to resend the offer since receiver is now ready
+            setTimeout(() => {
+                callerSocket.emit('call:resend-offer', { to: from });
+                console.log(`🔄 Requesting caller to resend offer`);
+            }, 500);
         }
     }
+});
+
+// Handle request to resend offer
+socket.on('call:resend-offer', async (data) => {
+    const { to } = data;
+    console.log(`🔄 Caller received request to resend offer to ${to}`);
+    // The client will handle this by re-creating and sending the offer
 });
 
 // Handle call declined (from call window decline/end button)
