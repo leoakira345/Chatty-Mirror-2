@@ -5,132 +5,181 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Call - Chatty Mirror</title>
     <link rel="stylesheet" href="call.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📞</text></svg>">
 </head>
 <body>
-    <div class="call-container">
-        <!-- Incoming Call Screen -->
-        <div id="incomingCallScreen" class="incoming-call-screen" style="display: none;">
-            <div class="incoming-call-content">
-                <div class="caller-avatar">
-                    <span id="callerInitial">U</span>
-                </div>
-                <h2 id="callerName">User</h2>
-                <p id="callType">Video Call</p>
-                <div class="call-animation">
-                    <div class="pulse-ring"></div>
-                    <div class="pulse-ring delay-1"></div>
-                    <div class="pulse-ring delay-2"></div>
-                </div>
-                <div class="incoming-call-actions">
-                    <button id="declineBtn" class="call-action-btn decline-btn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 3l18 18M3 21L21 3"></path>
-                        </svg>
-                        <span>Decline</span>
-                    </button>
-                    <button id="acceptBtn" class="call-action-btn accept-btn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                        </svg>
-                        <span>Accept</span>
-                    </button>
-                </div>
+    <!-- Incoming Call Screen -->
+    <div id="incomingCallScreen" class="incoming-call-screen">
+        <div class="incoming-call-container">
+            <div class="caller-avatar" id="incomingCallerAvatar">
+                <span id="incomingCallerInitial">U</span>
             </div>
-        </div>
-
-        <!-- Active Call Screen -->
-        <div id="activeCallScreen" class="active-call-screen" style="display: none;">
-            <!-- Remote Video -->
-            <div class="video-container">
-                <video id="remoteVideo" autoplay playsinline></video>
-                <div id="remoteVideoPlaceholder" class="video-placeholder">
-                    <div class="avatar-large">
-                        <span id="remoteUserInitial">U</span>
-                    </div>
-                    <p id="remoteUserName">User</p>
-                </div>
+            <h2 id="incomingCallerName">Someone</h2>
+            <p class="call-type-label" id="incomingCallType">Incoming Call</p>
+            
+            <div class="ringing-animation">
+                <div class="ring"></div>
+                <div class="ring"></div>
+                <div class="ring"></div>
             </div>
-
-            <!-- Local Video (Picture-in-Picture) -->
-            <div class="local-video-container">
-                <video id="localVideo" autoplay muted playsinline></video>
-            </div>
-
-            <!-- Call Info -->
-            <div class="call-info">
-                <p id="callStatus">Connecting...</p>
-                <p id="callTimer" style="display: none;">00:00</p>
-            </div>
-
-            <!-- Call Controls -->
-            <div class="call-controls">
-                <button id="toggleVideoBtn" class="control-btn" title="Toggle Video">
-                    <svg id="videoOnIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-                    </svg>
-                    <svg id="videoOffIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
-                        <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"></path>
-                        <line x1="1" y1="1" x2="23" y2="23"></line>
-                    </svg>
-                </button>
-
-                <button id="toggleAudioBtn" class="control-btn" title="Toggle Audio">
-                    <svg id="audioOnIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
-                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                        <line x1="12" x2="12" y1="19" y2="22"></line>
-                    </svg>
-                    <svg id="audioOffIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
-                        <line x1="1" y1="1" x2="23" y2="23"></line>
-                        <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path>
-                        <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path>
-                        <line x1="12" y1="19" x2="12" y2="22"></line>
-                    </svg>
-                </button>
-
-                <button id="switchCameraBtn" class="control-btn" title="Switch Camera">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M17 8l4-4m0 0l-4-4m4 4H7a4 4 0 0 0-4 4v8"></path>
-                    </svg>
-                </button>
-
-                <button id="endCallBtn" class="control-btn end-call-btn" title="End Call">
+            
+            <div class="incoming-call-actions">
+                <button class="decline-btn" id="declineIncomingBtn" title="Decline">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="23" y1="1" x2="1" y2="23"></line>
                     </svg>
+                    <span>Decline</span>
                 </button>
-            </div>
-        </div>
-
-        <!-- Call Ended Screen -->
-        <div id="callEndedScreen" class="call-ended-screen" style="display: none;">
-            <div class="call-ended-content">
-                <div class="ended-icon">
+                
+                <button class="accept-btn" id="acceptIncomingBtn" title="Accept">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                     </svg>
-                </div>
-                <h2>Call Ended</h2>
-                <p id="callDuration">Duration: 00:00</p>
-                <button id="closeCallBtn" class="close-call-btn">Close</button>
+                    <span>Accept</span>
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- ⚙️ SERVER CONFIGURATION - REPLACE WITH YOUR RENDER BACKEND URL -->
-    <script>
-        // 🔧 IMPORTANT: Replace this with your actual Render backend URL
-        // Example: 'https://chatty-mirror-backend.onrender.com'
-        window.SERVER_URL = 'https://your-backend-app.onrender.com';
-        
-        console.log('🔧 Server configured:', window.SERVER_URL);
-    </script>
+    <!-- Connecting Screen -->
+    <div id="connectingScreen" class="connecting-screen">
+        <div class="connecting-container">
+            <div class="caller-avatar" id="connectingAvatar">
+                <span id="connectingInitial">U</span>
+            </div>
+            <h2 id="connectingName">Connecting...</h2>
+            <p class="connecting-status" id="connectingStatus">Calling...</p>
+            
+            <div class="connecting-animation">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+            
+            <button class="end-call-btn" id="cancelCallBtn" title="Cancel">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    <line x1="23" y1="1" x2="1" y2="23"></line>
+                </svg>
+                <span>Cancel</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Active Call Screen -->
+    <div id="activeCallScreen" class="active-call-screen">
+        <!-- Video Container -->
+        <div class="video-container" id="videoContainer">
+            <!-- Remote Video (Full Screen) -->
+            <video id="remoteVideo" autoplay playsinline></video>
+            
+            <!-- Local Video (Picture-in-Picture) -->
+            <video id="localVideo" autoplay playsinline muted></video>
+            
+            <!-- Call Info Overlay -->
+            <div class="call-info-overlay" id="callInfoOverlay">
+                <div class="call-info">
+                    <h3 id="activeCallName">Friend Name</h3>
+                    <p class="call-duration" id="callDuration">00:00</p>
+                </div>
+            </div>
+            
+            <!-- Audio-Only Mode Avatar -->
+            <div class="audio-mode-avatar" id="audioModeAvatar" style="display: none;">
+                <div class="avatar-large">
+                    <span id="audioAvatarInitial">U</span>
+                </div>
+                <h2 id="audioCallName">Friend Name</h2>
+                <p class="call-duration" id="audioDuration">00:00</p>
+            </div>
+        </div>
+
+        <!-- Call Controls -->
+        <div class="call-controls">
+            <button class="control-btn" id="toggleMicBtn" title="Mute/Unmute">
+                <svg class="mic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                    <line x1="12" x2="12" y1="19" y2="22"></line>
+                </svg>
+                <svg class="mic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                    <line x1="2" x2="22" y1="2" y2="22"></line>
+                    <path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"></path>
+                    <path d="M5 10v2a7 7 0 0 0 12 5"></path>
+                    <path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"></path>
+                    <path d="M9 9v3a3 3 0 0 0 5.12 2.12"></path>
+                    <line x1="12" x2="12" y1="19" y2="22"></line>
+                </svg>
+            </button>
+
+            <button class="control-btn" id="toggleVideoBtn" title="Enable/Disable Video" style="display: none;">
+                <svg class="video-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                </svg>
+                <svg class="video-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                    <line x1="2" x2="22" y1="2" y2="22"></line>
+                    <path d="m16 16-4-4V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-7Z"></path>
+                    <path d="m1 12 7 7v-7H1Z"></path>
+                </svg>
+            </button>
+
+            <button class="control-btn end-btn" id="endCallBtn" title="End Call">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    <line x1="23" y1="1" x2="1" y2="23"></line>
+                </svg>
+            </button>
+
+            <button class="control-btn" id="toggleSpeakerBtn" title="Speaker">
+                <svg class="speaker-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                </svg>
+                <svg class="speaker-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                    <line x1="2" x2="22" y1="2" y2="22"></line>
+                    <path d="M11 5 6 9H2v6h4l5 4V5Z"></path>
+                    <path d="m15 9 6 6"></path>
+                    <path d="m21 9-6 6"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Call Ended Screen -->
+    <div id="callEndedScreen" class="call-ended-screen">
+        <div class="call-ended-container">
+            <div class="call-ended-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    <line x1="23" y1="1" x2="1" y2="23"></line>
+                </svg>
+            </div>
+            <h2 id="callEndedTitle">Call Ended</h2>
+            <p id="callEndedMessage">The call has ended</p>
+            <p class="call-duration" id="finalCallDuration">Duration: 00:00</p>
+            
+            <button class="close-window-btn" id="closeWindowBtn">
+                Close Window
+            </button>
+        </div>
+    </div>
+
+    <!-- Audio Elements for Sounds -->
+    <audio id="ringingSound" loop>
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGGi78OScTgwOUKXh8LdjHQU2j9n0yncsBS52x+/gkD8KE12z6uytVxQKRp/g8r5sIAUrgc7y2Yk2CBhousn1w5bDHwZIoN7wurBkHAU5kdnyzHkrBSl3x+/djj8KFF613OutWhMKQ5/h8rpsIQYpgcz02oo1CBppwvnekzwQD1Cl4u+0ZR0FNI7a9Mp3KQSF7N6+azUnB3aEy+rWnE0MDVKj4u2fVhgKR6Lh7r1tIAUqf87w3Is1CBxqxu7dkT4KEV+06+muVxMJRJ/i7btrIQQpf8vx3Ik0Bxppu+/jn00MDlGk4u+1Yh4FN5DZ88p3LAUpdsfv3Y8/ChRfte7qrVYTCkSf4PK+bCAFK4HO8tmJNggYaLrw5JxODA5QpeHwt2MdBTaP2fTKdywFLnbH7+CQPwoTXbPq7K1XFApGn+DyvmwgBSuBzvLZiTYIGGi6yfXDlsMfBkig3vC6sGQcBTmR2fLMeSsFKXfH792OPwoUXrXe661aEwpDn+HyumwhBimBzPTaijUIGmnC+d6TPBAPUKXi77RlHQU0jtr0yncp" type="audio/wav">
+    </audio>
+    
+    <audio id="callEndedSound">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGGi78OScTgwOUKXh8LdjHQU2j9n0yncsBS52x+/gkD8KE12z6uytVxQKRp/g8r5sIAUrgc7y2Yk2CBhousn1w5bDHwZIoN7wurBkHAU5kdnyzHkrBSl3x+/djj8KFF613OutWhMKQ5/h8rpsIQYpgcz02oo1CBppwvnekzwQD1Cl4u+0ZR0FNI7a9Mp3KQSGx+vdkzMMD1Gh4e+2ZBwFNo7a88l4LAUpdsfu" type="audio/wav">
+    </audio>
 
     <!-- Socket.IO -->
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="call.js"></script>
 </body>
 </html>
-
