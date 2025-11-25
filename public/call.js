@@ -334,13 +334,13 @@ async function acceptIncomingCall() {
             peerConnection.addTrack(track, localStream);
         });
         
-        // Notify caller that call was accepted
+        console.log('✅ Ready to receive offer');
+        
+        // NOW notify caller that we're ready - AFTER peer connection is set up
         socket.emit('call:accepted', {
             to: friendId,
             from: myUserId
         });
-        
-        console.log('✅ Ready to receive offer');
         
     } catch (error) {
         console.error('❌ Error accepting call:', error);
@@ -449,28 +449,21 @@ async function handleCallOffer(data) {
     try {
         console.log('📥 Received call offer from:', data.from);
         
-        // If this is an incoming call (no local stream yet), wait for acceptance
-        if (!localStream) {
-            console.log('⚠️ No local stream yet, user needs to accept first');
-            return; // The offer will be handled after user accepts
+        // If this is an incoming call and we don't have a peer connection yet,
+        // the user needs to accept first
+        if (!peerConnection) {
+            console.log('⚠️ Waiting for user to accept call first');
+            return;
         }
         
-        // Create peer connection if not exists
-        if (!peerConnection) {
-            createPeerConnection();
-            
-            // Add local stream
-            localStream.getTracks().forEach(track => {
-                peerConnection.addTrack(track, localStream);
-            });
-        }
+        console.log('📝 Setting remote description and creating answer...');
         
         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
         
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
         
-        console.log('📤 Sending answer');
+        console.log('📤 Sending answer to:', data.from);
         
         socket.emit('call:answer', {
             to: data.from,
@@ -522,16 +515,27 @@ function handleCallEnded(data) {
     setTimeout(() => window.close(), 3000);
 }
 
-function handleCallAccepted(data) {
+async function handleCallAccepted(data) {
     console.log('✅ Call accepted by:', data.from);
     stopRingingSound();
     connectingStatus.textContent = 'Connecting...';
+    
+    // Give the receiver a moment to finish setting up their peer connection
+    setTimeout(() => {
+        console.log('🔄 Receiver ready, resending offer...');
+        resendOffer();
+    }, 1000);
 }
 
+// REPLACE WITH THIS:
 async function handleResendOffer(data) {
+    console.log('🔄 Server requested to resend offer');
+    await resendOffer();
+}
+
+// ADD THIS NEW FUNCTION right after handleResendOffer:
+async function resendOffer() {
     try {
-        console.log('🔄 Resending offer to:', data.to);
-        
         if (!peerConnection) {
             console.error('❌ No peer connection to resend offer');
             return;
