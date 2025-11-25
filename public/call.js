@@ -94,9 +94,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isOutgoingCall) {
         showConnectingScreen();
         startOutgoingCall();
-    } else {
-        // Incoming call - show incoming call screen immediately
-        showIncomingCallScreen();
     }
 });
 
@@ -129,20 +126,19 @@ function initializeSocket() {
     console.log('🔌 Connecting to Socket.IO:', SOCKET_URL);
     
     socket = io(SOCKET_URL, {
-        reconnection: false, // Don't reconnect - this is a call-only window
-        transports: ['websocket', 'polling'],
-        query: {
-            isCallWindow: 'true' // Mark this as a call window
-        }
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5,
+        transports: ['websocket', 'polling']
     });
 
     socket.on('connect', () => {
-        console.log('✅ Call window socket connected:', socket.id);
-        // DON'T emit user_connected - main window already did that
+        console.log('✅ Socket connected:', socket.id);
+        socket.emit('user_connected', myUserId);
     });
 
     socket.on('disconnect', () => {
-        console.log('❌ Call window socket disconnected');
+        console.log('❌ Socket disconnected');
     });
 
     // WebRTC Signaling Events
@@ -152,7 +148,6 @@ function initializeSocket() {
     socket.on('call:declined', handleCallDeclined);
     socket.on('call:ended', handleCallEnded);
     socket.on('call:accepted', handleCallAccepted);
-    socket.on('call:resend-offer', handleResendOffer);
 }
 
 // ==========================================
@@ -326,21 +321,14 @@ async function acceptIncomingCall() {
         // Get local media
         await getLocalMedia();
         
-        // Create peer connection
-        createPeerConnection();
-        
-        // Add local stream to peer connection
-        localStream.getTracks().forEach(track => {
-            peerConnection.addTrack(track, localStream);
-        });
-        
-        console.log('✅ Ready to receive offer');
-        
-        // NOW notify caller that we're ready - AFTER peer connection is set up
+        // Notify caller that call was accepted
         socket.emit('call:accepted', {
             to: friendId,
             from: myUserId
         });
+        
+        // Wait for the offer from caller
+        // The offer will be handled by handleCallOffer
         
     } catch (error) {
         console.error('❌ Error accepting call:', error);
@@ -449,21 +437,29 @@ async function handleCallOffer(data) {
     try {
         console.log('📥 Received call offer from:', data.from);
         
-        // If this is an incoming call and we don't have a peer connection yet,
-        // the user needs to accept first
-        if (!peerConnection) {
-            console.log('⚠️ Waiting for user to accept call first');
+        if (!localStream) {
+            console.log('⚠️ No local stream yet, waiting...');
+            // Show incoming call screen and wait for user to accept
+            showIncomingCallScreen();
             return;
         }
         
-        console.log('📝 Setting remote description and creating answer...');
+        // Create peer connection if not exists
+        if (!peerConnection) {
+            createPeerConnection();
+            
+            // Add local stream
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
+        }
         
         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
         
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
         
-        console.log('📤 Sending answer to:', data.from);
+        console.log('📤 Sending answer');
         
         socket.emit('call:answer', {
             to: data.from,
@@ -515,52 +511,10 @@ function handleCallEnded(data) {
     setTimeout(() => window.close(), 3000);
 }
 
-async function handleCallAccepted(data) {
+function handleCallAccepted(data) {
     console.log('✅ Call accepted by:', data.from);
     stopRingingSound();
     connectingStatus.textContent = 'Connecting...';
-    
-    // Give the receiver a moment to finish setting up their peer connection
-    setTimeout(() => {
-        console.log('🔄 Receiver ready, resending offer...');
-        resendOffer();
-    }, 1000);
-}
-
-// REPLACE WITH THIS:
-async function handleResendOffer(data) {
-    console.log('🔄 Server requested to resend offer');
-    await resendOffer();
-}
-
-// ADD THIS NEW FUNCTION right after handleResendOffer:
-async function resendOffer() {
-    try {
-        if (!peerConnection) {
-            console.error('❌ No peer connection to resend offer');
-            return;
-        }
-        
-        // Create and send new offer
-        const offer = await peerConnection.createOffer({
-            offerToReceiveAudio: true,
-            offerToReceiveVideo: callType === 'video'
-        });
-        
-        await peerConnection.setLocalDescription(offer);
-        
-        console.log('📤 Resending call offer to:', friendId);
-        
-        socket.emit('call:offer', {
-            to: friendId,
-            from: myUserId,
-            offer: offer,
-            isVideoCall: callType === 'video'
-        });
-        
-    } catch (error) {
-        console.error('❌ Error resending offer:', error);
-    }
 }
 
 // ==========================================
@@ -716,9 +670,9 @@ function cleanup() {
         peerConnection = null;
     }
     
-    // DON'T disconnect socket - it will make user appear offline in main window
-    // Just let the call window close naturally
-    console.log('✅ Cleanup complete - socket left connected for main window');
+    if (socket) {
+        socket.disconnect();
+    }
 }
 
 // ==========================================
