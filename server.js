@@ -584,6 +584,7 @@ socket.on('call:ice-candidate', (data) => {
 });
 
 // Handle call accepted notification
+// REPLACE WITH THIS:
 socket.on('call:accepted', (data) => {
     const { to, from } = data;
     
@@ -598,15 +599,10 @@ socket.on('call:accepted', (data) => {
     if (callerSocketId) {
         const callerSocket = io.sockets.sockets.get(callerSocketId);
         if (callerSocket) {
-            // Notify caller that receiver accepted
+            // Just notify caller that receiver accepted
+            // Client will handle resending offer with proper timing
             callerSocket.emit('call:accepted', { from: from });
             console.log(`✅ Acceptance notification sent to ${to}`);
-            
-            // Tell caller to resend the offer since receiver is now ready
-            setTimeout(() => {
-                callerSocket.emit('call:resend-offer', { to: from });
-                console.log(`🔄 Requesting caller to resend offer`);
-            }, 500);
         }
     }
 });
@@ -1431,4 +1427,3 @@ async function startServer() {
 }
 
 startServer();
-
