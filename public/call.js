@@ -94,6 +94,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isOutgoingCall) {
         showConnectingScreen();
         startOutgoingCall();
+    } else {
+        // Incoming call - show incoming call screen immediately
+        showIncomingCallScreen();
     }
 });
 
@@ -148,6 +151,7 @@ function initializeSocket() {
     socket.on('call:declined', handleCallDeclined);
     socket.on('call:ended', handleCallEnded);
     socket.on('call:accepted', handleCallAccepted);
+    socket.on('call:resend-offer', handleResendOffer);
 }
 
 // ==========================================
@@ -321,14 +325,21 @@ async function acceptIncomingCall() {
         // Get local media
         await getLocalMedia();
         
+        // Create peer connection
+        createPeerConnection();
+        
+        // Add local stream to peer connection
+        localStream.getTracks().forEach(track => {
+            peerConnection.addTrack(track, localStream);
+        });
+        
         // Notify caller that call was accepted
         socket.emit('call:accepted', {
             to: friendId,
             from: myUserId
         });
         
-        // Wait for the offer from caller
-        // The offer will be handled by handleCallOffer
+        console.log('✅ Ready to receive offer');
         
     } catch (error) {
         console.error('❌ Error accepting call:', error);
@@ -437,11 +448,10 @@ async function handleCallOffer(data) {
     try {
         console.log('📥 Received call offer from:', data.from);
         
+        // If this is an incoming call (no local stream yet), wait for acceptance
         if (!localStream) {
-            console.log('⚠️ No local stream yet, waiting...');
-            // Show incoming call screen and wait for user to accept
-            showIncomingCallScreen();
-            return;
+            console.log('⚠️ No local stream yet, user needs to accept first');
+            return; // The offer will be handled after user accepts
         }
         
         // Create peer connection if not exists
@@ -515,6 +525,37 @@ function handleCallAccepted(data) {
     console.log('✅ Call accepted by:', data.from);
     stopRingingSound();
     connectingStatus.textContent = 'Connecting...';
+}
+
+async function handleResendOffer(data) {
+    try {
+        console.log('🔄 Resending offer to:', data.to);
+        
+        if (!peerConnection) {
+            console.error('❌ No peer connection to resend offer');
+            return;
+        }
+        
+        // Create and send new offer
+        const offer = await peerConnection.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: callType === 'video'
+        });
+        
+        await peerConnection.setLocalDescription(offer);
+        
+        console.log('📤 Resending call offer to:', friendId);
+        
+        socket.emit('call:offer', {
+            to: friendId,
+            from: myUserId,
+            offer: offer,
+            isVideoCall: callType === 'video'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error resending offer:', error);
+    }
 }
 
 // ==========================================
