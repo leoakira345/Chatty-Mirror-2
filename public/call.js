@@ -137,6 +137,7 @@ function initializeSocket() {
 
     socket.on('connect', () => {
         console.log('✅ Socket connected:', socket.id);
+        // Emit user_connected so server knows we're here for signaling
         socket.emit('user_connected', myUserId);
     });
 
@@ -711,9 +712,9 @@ function cleanup() {
         peerConnection = null;
     }
     
-    if (socket) {
-        socket.disconnect();
-    }
+    // DON'T disconnect socket - it will make user appear offline in main window
+    // Just let the call window close naturally
+    console.log('✅ Cleanup complete - socket left connected for main window');
 }
 
 // ==========================================
