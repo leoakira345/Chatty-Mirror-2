@@ -663,36 +663,38 @@ socket.on('call:ended', (data) => {
     // ==========================================
 
     socket.on('disconnect', () => {
-    // Check if this is a call window socket
-    const isCallWindow = socket.handshake.query?.isCallWindow === 'true';
-    
-    if (isCallWindow) {
-        console.log('📞 Call window closed:', socket.id, '(not marking user offline)');
-        return; // Don't mark user as offline - main window is still connected
-    }
-    
-    // Only mark user offline if main chat window disconnects
     let disconnectedUserId = null;
+    
+    // Find which user this socket belongs to
     for (const [userId, socketId] of activeUsers.entries()) {
         if (socketId === socket.id) {
             disconnectedUserId = userId;
-            activeUsers.delete(userId);
             break;
         }
     }
     
     if (disconnectedUserId) {
-        console.log(`👋 User ${disconnectedUserId} disconnected`);
-        console.log(`📊 Total active users: ${activeUsers.size}`);
-        socket.broadcast.emit('user_status', { 
-            userId: disconnectedUserId, 
-            status: 'offline' 
-        });
+        // Don't immediately delete - check if user has other connections
+        setTimeout(() => {
+            // After 2 seconds, check if user reconnected
+            // If they have a newer socket, don't mark as offline
+            const currentSocketId = activeUsers.get(disconnectedUserId);
+            
+            if (currentSocketId === socket.id || !currentSocketId) {
+                // No newer connection, user is actually offline
+                activeUsers.delete(disconnectedUserId);
+                console.log(`👋 User ${disconnectedUserId} disconnected (confirmed offline)`);
+                console.log(`📊 Total active users: ${activeUsers.size}`);
+                socket.broadcast.emit('user_status', { 
+                    userId: disconnectedUserId, 
+                    status: 'offline' 
+                });
+            } else {
+                console.log(`🔄 User ${disconnectedUserId} has newer connection, keeping online`);
+            }
+        }, 2000); // 2 second grace period
     }
 });
-    socket.on('error', (error) => {
-        console.error('❌ Socket error:', error);
-    });
 
 }); // ← CLOSING BRACKET FOR io.on('connection')
 
