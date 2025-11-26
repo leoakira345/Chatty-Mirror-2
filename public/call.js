@@ -712,9 +712,8 @@ function cleanup() {
         peerConnection = null;
     }
     
-    // DON'T disconnect socket - it will make user appear offline in main window
-    // Just let the call window close naturally
-    console.log('✅ Cleanup complete - socket left connected for main window');
+    // Don't disconnect socket - let it disconnect naturally when window closes
+    // This prevents the main window's connection from being affected
 }
 
 // ==========================================
