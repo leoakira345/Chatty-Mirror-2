@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURATION
 // ==========================================
-const isDevelopment = window.location.hostname === 'localhost' || 
+const isDevelopment = window.location.hostname === 'localhost' ||
                       window.location.hostname === '127.0.0.1';
 
 const SOCKET_URL = isDevelopment
@@ -720,3 +720,4 @@ function cleanup() {
 // END OF FILE
 // ==========================================
 console.log('✅ call.js loaded successfully');
+
