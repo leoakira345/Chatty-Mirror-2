@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURATION
 // ==========================================
-const isDevelopment = window.location.hostname === 'localhost' ||
+const isDevelopment = window.location.hostname === 'localhost' || 
                       window.location.hostname === '127.0.0.1';
 
 const SOCKET_URL = isDevelopment
@@ -261,25 +261,38 @@ function hideAllScreens() {
 async function startOutgoingCall() {
     try {
         console.log('📞 Starting outgoing call...');
+        console.log('📊 Call type:', callType);
+        console.log('📊 Friend ID:', friendId);
+        console.log('📊 My User ID:', myUserId);
         
         // Get local media
+        console.log('🎥 Requesting local media...');
         await getLocalMedia();
+        console.log('✅ Local media obtained');
         
         // Create peer connection
+        console.log('🔗 Creating peer connection...');
         createPeerConnection();
+        console.log('✅ Peer connection created');
         
         // Add local stream to peer connection
+        console.log('➕ Adding tracks to peer connection...');
         localStream.getTracks().forEach(track => {
             peerConnection.addTrack(track, localStream);
+            console.log('  ➕ Added', track.kind, 'track');
         });
         
         // Create and send offer
+        console.log('📝 Creating offer...');
         const offer = await peerConnection.createOffer({
             offerToReceiveAudio: true,
             offerToReceiveVideo: callType === 'video'
         });
+        console.log('✅ Offer created');
         
+        console.log('📝 Setting local description...');
         await peerConnection.setLocalDescription(offer);
+        console.log('✅ Local description set');
         
         console.log('📤 Sending call offer to:', friendId);
         
@@ -289,6 +302,8 @@ async function startOutgoingCall() {
             offer: offer,
             isVideoCall: callType === 'video'
         });
+        
+        console.log('✅ Offer sent successfully');
         
     } catch (error) {
         console.error('❌ Error starting call:', error);
@@ -375,13 +390,25 @@ function createPeerConnection() {
     // Handle ICE candidates
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-            console.log('🧊 Sending ICE candidate');
+            console.log('🧊 Generated ICE candidate, sending to', friendId);
             socket.emit('call:ice-candidate', {
                 to: friendId,
                 from: myUserId,
                 candidate: event.candidate
             });
+        } else {
+            console.log('🧊 ICE gathering complete');
         }
+    };
+    
+    // Handle ICE gathering state
+    peerConnection.onicegatheringstatechange = () => {
+        console.log('🧊 ICE gathering state:', peerConnection.iceGatheringState);
+    };
+    
+    // Handle ICE connection state
+    peerConnection.oniceconnectionstatechange = () => {
+        console.log('🧊 ICE connection state:', peerConnection.iceConnectionState);
     };
     
     // Handle incoming tracks (remote stream)
@@ -391,17 +418,20 @@ function createPeerConnection() {
         if (!remoteStream) {
             remoteStream = new MediaStream();
             remoteVideo.srcObject = remoteStream;
+            console.log('✅ Remote stream attached to video element');
         }
         
         remoteStream.addTrack(event.track);
+        console.log('✅ Remote track added to stream');
     };
     
     // Handle connection state changes
     peerConnection.onconnectionstatechange = () => {
         console.log('🔗 Connection state:', peerConnection.connectionState);
+        console.log('🔗 Signaling state:', peerConnection.signalingState);
         
         if (peerConnection.connectionState === 'connected') {
-            console.log('✅ Peer connection established');
+            console.log('✅ Peer connection established!');
             showActiveCallScreen();
         } else if (peerConnection.connectionState === 'disconnected' || 
                    peerConnection.connectionState === 'failed') {
@@ -410,6 +440,7 @@ function createPeerConnection() {
         }
     };
     
+    console.log('✅ Peer connection created with all handlers');
     return peerConnection;
 }
 
@@ -487,13 +518,24 @@ async function handleCallOffer(data) {
 async function handleCallAnswer(data) {
     try {
         console.log('📥 Received call answer from:', data.from);
+        console.log('📊 Peer connection state:', peerConnection?.connectionState);
+        console.log('📊 Signaling state:', peerConnection?.signalingState);
         
+        if (!peerConnection) {
+            console.error('❌ No peer connection exists!');
+            return;
+        }
+        
+        console.log('📝 Setting remote description with answer...');
         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
         
         console.log('✅ Answer set successfully');
+        console.log('📊 New peer connection state:', peerConnection.connectionState);
+        console.log('📊 New signaling state:', peerConnection.signalingState);
         
     } catch (error) {
         console.error('❌ Error handling answer:', error);
+        alert('Error handling answer: ' + error.message);
         endCall();
     }
 }
@@ -501,8 +543,16 @@ async function handleCallAnswer(data) {
 async function handleIceCandidate(data) {
     try {
         if (data.candidate && peerConnection) {
-            console.log('📥 Adding ICE candidate');
+            console.log('📥 Received ICE candidate from:', data.from);
             await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            console.log('✅ ICE candidate added successfully');
+        } else {
+            if (!data.candidate) {
+                console.log('📥 Received null ICE candidate (end of candidates)');
+            }
+            if (!peerConnection) {
+                console.error('❌ No peer connection to add ICE candidate to!');
+            }
         }
     } catch (error) {
         console.error('❌ Error adding ICE candidate:', error);
@@ -720,4 +770,3 @@ function cleanup() {
 // END OF FILE
 // ==========================================
 console.log('✅ call.js loaded successfully');
-
