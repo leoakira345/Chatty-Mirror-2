@@ -3018,6 +3018,9 @@ window.performLogout = performLogout;
 // ==========================================
 // CALL FUNCTIONALITY
 // ==========================================
+// ==========================================
+// CALL FUNCTIONALITY - FIXED
+// ==========================================
 function setupCallButtons() {
     const voiceCallBtn = document.getElementById('voiceCallBtn');
     const videoCallBtn = document.getElementById('videoCallBtn');
@@ -3025,7 +3028,7 @@ function setupCallButtons() {
     if (voiceCallBtn) {
         voiceCallBtn.addEventListener('click', () => {
             if (selectedFriend) {
-                startCall('audio');
+                startCall('audio');  // ✅ Explicitly pass 'audio'
             } else {
                 alert('Please select a friend first');
             }
@@ -3035,7 +3038,7 @@ function setupCallButtons() {
     if (videoCallBtn) {
         videoCallBtn.addEventListener('click', () => {
             if (selectedFriend) {
-                startCall('video');
+                startCall('video');  // ✅ Explicitly pass 'video'
             } else {
                 alert('Please select a friend first');
             }
@@ -3046,6 +3049,12 @@ function setupCallButtons() {
 }
 
 function startCall(type) {
+    // ✅ Add validation
+    if (!type) {
+        console.error('❌ Call type not specified');
+        type = 'audio'; // Default to audio
+    }
+    
     if (!selectedFriend || !currentUser) {
         alert('Unable to start call - missing user information');
         return;
@@ -3063,7 +3072,7 @@ function startCall(type) {
         callerId: currentUser.id,
         receiverId: selectedFriend.id,
         callerName: currentUser.username,
-        callType: type
+        callType: type  // ✅ This should be 'audio' or 'video'
     });
     
     // Then open the call window for the caller
@@ -3076,12 +3085,11 @@ function startCall(type) {
     if (!callWindow) {
         alert('Failed to open call window. Please allow pop-ups for this site.');
     } else {
-        console.log('✅ Call window opened for outgoing call');
+        console.log(`✅ Call window opened for outgoing ${type} call`);
     }
 }
 
 window.startCall = startCall;
-
 // ==========================================
 // ==========================================
 // PAINT MODAL FUNCTIONALITY
