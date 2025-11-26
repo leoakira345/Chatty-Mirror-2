@@ -434,13 +434,16 @@ io.on('connection', (socket) => {
    // FIXED WebRTC Call Signaling Section
 // Replace your existing call signaling section (lines ~380-520) with this:
 
+// ==========================================
+// WEBRTC CALL SIGNALING - FIXED VERSION
+// ==========================================
+
 // Handle call initiation (notification to receiver)
 socket.on('initiate_call', (data) => {
     const { callerId, receiverId, callerName, callType } = data;
     
     console.log(`📞 Call initiation: ${callerId} -> ${receiverId} (${callType})`);
     
-    // Validate data
     if (!callerId || !receiverId || !callerName || !callType) {
         socket.emit('call:declined', { reason: 'Invalid call data' });
         return;
@@ -468,7 +471,7 @@ socket.on('initiate_call', (data) => {
     }
 });
 
-// Handle call rejection (when user clicks decline on incoming screen)
+// Handle call rejection (when user clicks decline)
 socket.on('call_rejected', (data) => {
     const { callerId, receiverId } = data;
     
@@ -487,8 +490,7 @@ socket.on('call_rejected', (data) => {
     }
 });
 
-
-// Replace the call:offer handler with this improved version
+// Handle WebRTC offer
 socket.on('call:offer', (data) => {
     const { to, from, offer, isVideoCall } = data;
     
@@ -516,7 +518,7 @@ socket.on('call:offer', (data) => {
     const receiverSocket = io.sockets.sockets.get(receiverSocketId);
     if (!receiverSocket) {
         console.log(`⚠️ Receiver socket not found for ${to}`);
-        activeUsers.delete(to); // Clean up stale entry
+        activeUsers.delete(to);
         socket.emit('call:declined', { 
             reason: 'User is not available',
             from: to 
@@ -531,7 +533,6 @@ socket.on('call:offer', (data) => {
     });
     console.log(`✅ Call offer sent to ${to}`);
 });
-
 
 // Handle WebRTC answer
 socket.on('call:answer', (data) => {
@@ -584,7 +585,6 @@ socket.on('call:ice-candidate', (data) => {
 });
 
 // Handle call accepted notification
-// REPLACE WITH THIS:
 socket.on('call:accepted', (data) => {
     const { to, from } = data;
     
@@ -599,22 +599,13 @@ socket.on('call:accepted', (data) => {
     if (callerSocketId) {
         const callerSocket = io.sockets.sockets.get(callerSocketId);
         if (callerSocket) {
-            // Just notify caller that receiver accepted
-            // Client will handle resending offer with proper timing
             callerSocket.emit('call:accepted', { from: from });
             console.log(`✅ Acceptance notification sent to ${to}`);
         }
     }
 });
 
-// Handle request to resend offer
-socket.on('call:resend-offer', async (data) => {
-    const { to } = data;
-    console.log(`🔄 Caller received request to resend offer to ${to}`);
-    // The client will handle this by re-creating and sending the offer
-});
-
-// Handle call declined (from call window decline/end button)
+// Handle call declined
 socket.on('call:declined', (data) => {
     const { to, from, reason } = data;
     
@@ -658,6 +649,7 @@ socket.on('call:ended', (data) => {
         }
     }
 });
+
     // ==========================================
     // DISCONNECT AND ERROR HANDLERS
     // ==========================================
